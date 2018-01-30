@@ -8,6 +8,7 @@ module Main where
 import qualified Data.Text                     as T
 import           Data.Text.Lazy
 import           System.Directory              (doesFileExist)
+import           Text.Blaze.Html
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import           Text.Markdown                 (def, markdown)
 import           Yesod
@@ -41,10 +42,10 @@ getPageR page = do
         liftIO $ writeFile fileName content
         redirect $ EditR page
 
-getEditR :: Text -> Handler TypedContent
+getEditR :: Text -> Handler Html
 getEditR page = do
     editor <- liftIO $ editorFor page
-    sendResponse $ TypedContent typeHtml $ toContent editor
+    return $ preEscapedToHtml editor
 
 postEditR :: Text -> Handler Html
 postEditR page = do
@@ -59,7 +60,7 @@ editorFor :: Text -> IO String
 editorFor page = do
     let fileName = fileNameFor page
     md <- liftIO $ readFile fileName
-    return $ htmlHeader page ++
+    return $ unpack (renderHtml cssLink) ++ htmlHeader page ++
         "<form action=\"" ++ unpack page ++ "\" method=\"POST\">" ++
             "<textarea name=\"content\" cols=\"120\" rows=\"30\">" ++
             md ++
@@ -72,13 +73,21 @@ fileNameFor page =
 newPage :: String
 newPage = "\r\n## Use MarkDown to format page content"
 
-pageHeader :: String -> String
-pageHeader page =
+mdHeader :: String -> String
+mdHeader page =
         "[home](/) | versions | referenced by | [edit](/edit/" ++ page ++ ") | \r\n\r\n" ++
         "#" ++ page ++ "\r\n"
 
 htmlHeader :: Text -> String
-htmlHeader page = unpack $ renderHtml $ markdown def $ pack $ pageHeader (unpack page)
+htmlHeader page =
+  (unpack $ renderHtml $ markdown def $ pack $ mdHeader (unpack page))
+
+cssLink :: Html
+cssLink = preEscapedToHtml (
+  "<link rel=\"stylesheet\" href=\"//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\">" ++
+  "<link rel=\"stylesheet\" href=\"//cdn.rawgit.com/necolas/normalize.css/master/normalize.css\">" ++
+  "<link rel=\"stylesheet\" href=\"//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css\">" :: String)
 
 htmlFromMd :: Text -> String -> Html
-htmlFromMd page content = markdown def $ pack $ pageHeader (unpack page) ++ content
+htmlFromMd page content =
+  toHtml [cssLink, markdown def $ pack $ mdHeader (unpack page) ++ content]
