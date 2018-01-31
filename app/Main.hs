@@ -3,6 +3,8 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE ViewPatterns      #-}
+{-# LANGUAGE DeriveDataTypeable #-}
+{-# OPTIONS_GHC -fno-cse #-}
 module Main where
 
 import qualified Data.Text                     as T
@@ -10,7 +12,8 @@ import           Data.Text.Lazy
 import           System.Directory              (doesFileExist)
 import           Text.Blaze.Html
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
-import           Text.Markdown                 (def, markdown)
+import qualified Text.Markdown                 as MD (def, markdown)
+import           System.Console.CmdArgs
 import           Yesod
 
 data HsWiki =
@@ -27,7 +30,14 @@ mkYesod
 instance Yesod HsWiki
 
 main :: IO ()
-main = warp 3000 HsWiki
+main = do
+  print =<< cmdArgs myArgs
+  warp 3000 HsWiki
+
+data Args = Args {port :: Int, contentDir :: String}
+              deriving (Show, Data, Typeable)
+
+myArgs = Args{port = def, contentDir = def}
 
 -- Route Handlers
 getHomeR :: Handler Html
@@ -103,4 +113,4 @@ buildViewFor page content =
   toHtml [pageHeader, menuBar page, parseToMd content, pageFooter]
 
 parseToMd :: String -> Html
-parseToMd s = markdown def $ pack s
+parseToMd s = MD.markdown MD.def $ pack s

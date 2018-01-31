@@ -24,6 +24,7 @@ executable HsWiki
                      , yesod
                      , text
                      , directory
+                     , cmdargs
 
   default-language:    Haskell2010
 
