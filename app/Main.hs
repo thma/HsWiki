@@ -60,9 +60,9 @@ editorFor :: Text -> IO String
 editorFor page = do
     let fileName = fileNameFor page
     md <- liftIO $ readFile fileName
-    return $ unpack (renderHtml cssLink) ++ htmlHeader page ++
+    return $ unpack (renderHtml pageHeader) ++ htmlHeader page ++
         "<form action=\"" ++ unpack page ++ "\" method=\"POST\">" ++
-            "<textarea name=\"content\" cols=\"120\" rows=\"30\">" ++
+            "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"30\">" ++
             md ++
             "</textarea><button>save</button></form>"
 
@@ -75,19 +75,28 @@ newPage = "\r\n## Use MarkDown to format page content"
 
 mdHeader :: String -> String
 mdHeader page =
-        "[home](/) | versions | referenced by | [edit](/edit/" ++ page ++ ") | \r\n\r\n" ++
+        "[home](/) | versions | referenced by | [edit](/edit/" ++ page ++ ") | &nbsp;&nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) | \r\n\r\n" ++
         "#" ++ page ++ "\r\n"
 
 htmlHeader :: Text -> String
-htmlHeader page =
-  (unpack $ renderHtml $ markdown def $ pack $ mdHeader (unpack page))
+htmlHeader page = unpack $ renderHtml $ markdown def $ pack $ mdHeader (unpack page)
 
-cssLink :: Html
-cssLink = preEscapedToHtml (
-  "<link rel=\"stylesheet\" href=\"//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\">" ++
-  "<link rel=\"stylesheet\" href=\"//cdn.rawgit.com/necolas/normalize.css/master/normalize.css\">" ++
-  "<link rel=\"stylesheet\" href=\"//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css\">" :: String)
+menuBar :: Text -> Html
+menuBar page = markdown def $ pack $ mdHeader (unpack page)
+
+pageHeader :: Html
+pageHeader = preEscapedToHtml $ 
+  "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n" ++
+  "<title>HsWiki</title>\r\n" ++
+  "<meta charset=\"UTF-8\">\r\n" ++
+  "<link rel=\"stylesheet\" href=\"//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\">\r\n" ++
+  "<link rel=\"stylesheet\" href=\"//cdn.rawgit.com/necolas/normalize.css/master/normalize.css\">\r\n" ++
+  "<link rel=\"stylesheet\" href=\"//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css\">\r\n" ++
+  "</head>\r\n<body>\r\n<div class=\"container\">\r\n"
+
+pageFooter :: Html
+pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: String)
 
 htmlFromMd :: Text -> String -> Html
 htmlFromMd page content =
-  toHtml [cssLink, markdown def $ pack $ mdHeader (unpack page) ++ content]
+  toHtml [pageHeader, menuBar page, markdown def $ pack content, pageFooter]
