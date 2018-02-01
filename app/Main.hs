@@ -17,7 +17,7 @@ import           System.Console.CmdArgs
 import           Yesod
 
 data HsWiki =
-  HsWiki
+  HsWiki {pages :: String}
 
 mkYesod
   "HsWiki"
@@ -31,13 +31,19 @@ instance Yesod HsWiki
 
 main :: IO ()
 main = do
-  print =<< cmdArgs myArgs
-  warp 3000 HsWiki
+  args <- cmdArgs defaultArgs
+  print args
+  warp (port args) HsWiki {pages = contentDir args}
 
-data Args = Args {port :: Int, contentDir :: String}
-              deriving (Show, Data, Typeable)
+data Args = Args {port :: Int, contentDir :: String} deriving (Show, Data, Typeable)
 
-myArgs = Args{port = def, contentDir = def}
+defaultArgs = Args{port = 3000
+                       &= help "IP port to be used",
+             contentDir = "container"
+                       &= typ "DIRECTORY"
+                       &= help "store pages in this directory"}
+           &= summary "HsWiki v1.0, (C) Thomas Mahler 2018"
+           &= program "HsWiki"
 
 -- Route Handlers
 getHomeR :: Handler Html
