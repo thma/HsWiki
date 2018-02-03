@@ -3,8 +3,7 @@
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeFamilies      #-}
 {-# LANGUAGE ViewPatterns      #-}
-{-# LANGUAGE DeriveDataTypeable #-}
-{-# OPTIONS_GHC -fno-cse #-}
+
 module Main where
 
 import qualified Data.Text                     as T
@@ -13,11 +12,12 @@ import           System.Directory              (doesFileExist)
 import           Text.Blaze.Html
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Markdown                 as MD (def, markdown)
-import           System.Console.CmdArgs
+import           Util.Config                   (commandLineArgs, dir, port)
 import           Yesod
 
-data HsWiki =
-  HsWiki {pages :: String}
+newtype HsWiki = HsWiki
+  { contentDir :: String
+  }
 
 mkYesod
   "HsWiki"
@@ -31,19 +31,9 @@ instance Yesod HsWiki
 
 main :: IO ()
 main = do
-  args <- cmdArgs defaultArgs
-  print args
-  warp (port args) HsWiki {pages = contentDir args}
-
-data Args = Args {port :: Int, contentDir :: String} deriving (Show, Data, Typeable)
-
-defaultArgs = Args{port = 3000
-                       &= help "IP port to be used",
-             contentDir = "container"
-                       &= typ "DIRECTORY"
-                       &= help "store pages in this directory"}
-           &= summary "HsWiki v1.0, (C) Thomas Mahler 2018"
-           &= program "HsWiki"
+  args <- commandLineArgs
+  putStrLn $ "HsWiki starting on port " ++ show (port args) ++ ", document root: " ++ dir args
+  warp (port args) HsWiki {contentDir = dir args}
 
 -- Route Handlers
 getHomeR :: Handler Html
@@ -51,7 +41,8 @@ getHomeR = getPageR "index"
 
 getPageR :: Text -> Handler Html
 getPageR page = do
-  let fileName = fileNameFor page
+  path <- getDocumentRoot
+  let fileName = fileNameFor path page
   exists <- liftIO $ doesFileExist fileName
   if exists
     then do
@@ -62,31 +53,43 @@ getPageR page = do
       redirect $ EditR page
 
 getEditR :: Text -> Handler Html
-getEditR page = liftIO $ buildEditorFor page
+getEditR page = do
+  path <- getDocumentRoot
+  liftIO $ buildEditorFor path page
 
 postEditR :: Text -> Handler Html
 postEditR page = do
-  let fileName = fileNameFor page
+  path <- getDocumentRoot
+  let fileName = fileNameFor path page
   maybeContent <- lookupPostParam "content"
   case maybeContent of
     Just content -> liftIO $ writeFile fileName $ T.unpack content
   redirect $ PageR page
 
 -- helper functions
-buildEditorFor :: Text -> IO Html
-buildEditorFor page = do
-  md <- readFile $ fileNameFor page
-  return $ toHtml [pageHeader, menuBar page,
-    preEscapedToHtml $
-      "<form action=\"" ++
-      unpack page ++
-      "\" method=\"POST\">" ++
-      "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">" ++
-      md ++ "</textarea><button>save</button></form>",
-    pageFooter]
+getDocumentRoot :: Handler String
+getDocumentRoot = do
+  hsWiki <- getYesod
+  return $ contentDir hsWiki
 
-fileNameFor :: Text -> String
-fileNameFor page = "content/" ++ unpack page ++ ".md"
+buildEditorFor :: FilePath -> Text -> IO Html
+buildEditorFor path page = do
+  md <- readFile $ fileNameFor path page
+  return $
+    toHtml
+      [ pageHeader
+      , menuBar page
+      , preEscapedToHtml $
+        "<form action=\"" ++
+        unpack page ++
+        "\" method=\"POST\">" ++
+        "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">" ++
+        md ++ "</textarea><button>save</button></form>"
+      , pageFooter
+      ]
+
+fileNameFor :: FilePath -> Text -> String
+fileNameFor path page = path ++ "/" ++ unpack page ++ ".md"
 
 newPage :: String
 newPage = "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
@@ -102,7 +105,8 @@ menuBar :: Text -> Html
 menuBar page = parseToMd $ mdMenu page
 
 pageHeader :: Html
-pageHeader = preEscapedToHtml $
+pageHeader =
+  preEscapedToHtml $
   "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n" ++
   "<title>HsWiki</title>\r\n" ++
   "<meta charset=\"UTF-8\">\r\n" ++
@@ -115,8 +119,7 @@ pageFooter :: Html
 pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: String)
 
 buildViewFor :: Text -> String -> Html
-buildViewFor page content =
-  toHtml [pageHeader, menuBar page, parseToMd content, pageFooter]
+buildViewFor page content = toHtml [pageHeader, menuBar page, parseToMd content, pageFooter]
 
 parseToMd :: String -> Html
 parseToMd s = MD.markdown MD.def $ pack s
