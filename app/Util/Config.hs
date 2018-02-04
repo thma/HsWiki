@@ -2,7 +2,7 @@
 {-# OPTIONS_GHC -fno-cse #-}
 
 module Util.Config
-  ( commandLineArgs
+  ( getCommandLineArgs
   , port
   , dir
   ) where
@@ -23,4 +23,4 @@ defaultArgs =
   summary "HsWiki v1.0, https://github.com/thma/HsWiki" &=
   program "HsWiki"
 
-commandLineArgs = cmdArgs defaultArgs
+getCommandLineArgs = cmdArgs defaultArgs

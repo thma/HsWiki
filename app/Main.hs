@@ -12,16 +12,14 @@ import           System.Directory              (doesFileExist)
 import           Text.Blaze.Html
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
 import qualified Text.Markdown                 as MD (def, markdown)
-import           Util.Config                   (commandLineArgs, dir, port)
+import           Util.Config                   (getCommandLineArgs, dir, port)
 import           Yesod
 
 newtype HsWiki = HsWiki
   { contentDir :: String
   }
 
-mkYesod
-  "HsWiki"
-  [parseRoutes|
+mkYesod "HsWiki" [parseRoutes|
 /           HomeR   GET
 /#Text      PageR   GET
 /edit/#Text EditR   GET POST
@@ -31,7 +29,7 @@ instance Yesod HsWiki
 
 main :: IO ()
 main = do
-  args <- commandLineArgs
+  args <- getCommandLineArgs
   putStrLn $ "HsWiki starting on port " ++ show (port args) ++ ", document root: " ++ dir args
   warp (port args) HsWiki {contentDir = dir args}
 
@@ -68,9 +66,7 @@ postEditR page = do
 
 -- helper functions
 getDocumentRoot :: Handler String
-getDocumentRoot = do
-  hsWiki <- getYesod
-  return $ contentDir hsWiki
+getDocumentRoot = getsYesod contentDir
 
 buildEditorFor :: FilePath -> Text -> IO Html
 buildEditorFor path page = do
