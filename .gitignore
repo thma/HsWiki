@@ -2,3 +2,6 @@
 .idea
 stack.yaml
 root
+*.aes
+*.iml
+cabal.config
