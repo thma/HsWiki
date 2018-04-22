@@ -21,11 +21,11 @@ Simple Wiki in the spirit of the legendary C2-Wiki - written in haskell with yes
     HsWiki
 
 ## How to deploy as docker container
-1. clone the AlpineHaskell project:
+1. clone the [AlpineHaskell](https://github.com/thma/AlpineHaskell) project:
 ```
 git clone https://github.com/thma/AlpineHaskell.git
 ```
-2. change to AlpineHaskell directory and build the alpine-haskell docker base-image by executing
+2. change to the AlpineHaskell directory and build the alpine-haskell docker base-image by executing
 ```
 $ ./build.sh 
 Sending build context to Docker daemon  4.808MB
@@ -73,11 +73,11 @@ HsWiki starting on port 3000, document root: content
 22/Apr/2018:08:41:27 +0000 [Info#yesod-core] Application launched @(yesod-core-1.6.2-BbBvVW2wkIv5HBlOLVMZvZ:Yesod.Core.Dispatch ./Yesod/Core/Dispatch.hs:167:11)
 ```
 
-Withe above command the HsWiki application writes all documents into the /content folder within the
+With the above command the HsWiki application writes all documents into the /content folder within the
 docker container. After restarting the container all these documents will be gone as the
-container starts up the original image with an empty /contant folder.
+container starts up the original image with an empty /content folder.
 
-In order to keep the generated documents persistent across container restarts you can the docker --mount option as in the following example. The /tmp folder of the host system is mounted as /content in the docker container. Thus all created documents will be read from / written to the /tmp folder of the host system.
+In order to keep the generated documents persistent across container restarts you can use the docker --mount option as in the following example. The /tmp folder of the host system is mounted as /content in the docker container. Thus all created documents will be read from or written to the /tmp folder of the host system.
 
 ```
 sudo docker run -it -p 3000:3000 --mount type=bind,source=/tmp,target=/content hswiki 
