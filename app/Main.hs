@@ -7,13 +7,16 @@
 module Main where
 
 import qualified Data.Text                     as T
-import           Data.Text.Lazy
-import           System.Directory              (doesFileExist)
-import           Text.Blaze.Html
+import           Data.Text.Lazy                (Text, pack, unpack)
+import           Data.List
+import           System.Directory              (doesFileExist, listDirectory)
+import           Text.Blaze.Html               ( preEscapedToHtml, toHtml, Html )
 import           Text.Blaze.Html.Renderer.Text (renderHtml)
-import qualified Text.Markdown                 as MD (def, markdown)
-import           Util.Config                   (getCommandLineArgs, dir, port)
+import           CMarkGFM                      (commonmarkToHtml)
+import           Control.Monad                 (when)
+import           System.Console.CmdArgs
 import           Yesod
+import Util.Config
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -61,12 +64,30 @@ postEditR page = do
   let fileName = fileNameFor path page
   maybeContent <- lookupPostParam "content"
   case maybeContent of
-    Just content -> liftIO $ writeFile fileName $ T.unpack content
+    Just content -> liftIO $ do
+      safeVersion path page
+      writeFile fileName $ T.unpack content
   redirect $ PageR page
 
 -- helper functions
 getDocumentRoot :: Handler String
 getDocumentRoot = getsYesod contentDir
+
+safeVersion :: FilePath -> Text -> IO ()
+safeVersion path page = do
+  let fileName = fileNameFor path page
+  exists <- doesFileExist fileName
+  when exists $ do
+    content <- readFile fileName
+    version <- maxVersion path (unpack page)
+    let newFileName = fileNameFor path $ pack (unpack page ++ version)
+    writeFile newFileName content
+
+maxVersion :: FilePath -> String -> IO String
+maxVersion path page = do
+  allFiles <- listDirectory path
+  let versions = length $ filter (isPrefixOf page) allFiles
+  return $ "." ++ show versions
 
 buildEditorFor :: FilePath -> Text -> IO Html
 buildEditorFor path page = do
@@ -77,10 +98,13 @@ buildEditorFor path page = do
       , menuBar page
       , preEscapedToHtml $
         "<form action=\"" ++
-        unpack page ++
-        "\" method=\"POST\">" ++
-        "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">" ++
-        md ++ "</textarea><button>save</button></form>"
+          unpack page ++
+          "\" method=\"POST\">" ++
+          "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">" ++
+          md ++ "</textarea>" ++
+          "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; " ++
+          "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.location.href='/" ++ unpack page ++ "';\" />" ++     
+        "</form>"
       , pageFooter
       ]
 
@@ -94,11 +118,11 @@ mdMenu :: Text -> String
 mdMenu page =
   "[home](/) | versions | referenced by | [edit](/edit/" ++
   unpack page ++
-  ") | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) | \r\n\r\n" ++
-  "#" ++ unpack page ++ "\r\n"
+  ") | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n" ++
+  "# " ++ unpack page ++ "\r\n"
 
 menuBar :: Text -> Html
-menuBar page = parseToMd $ mdMenu page
+menuBar page = renderMdToHtml $ mdMenu page
 
 pageHeader :: Html
 pageHeader =
@@ -115,7 +139,7 @@ pageFooter :: Html
 pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: String)
 
 buildViewFor :: Text -> String -> Html
-buildViewFor page content = toHtml [pageHeader, menuBar page, parseToMd content, pageFooter]
+buildViewFor page content = toHtml [pageHeader, menuBar page, renderMdToHtml content, pageFooter]
 
-parseToMd :: String -> Html
-parseToMd s = MD.markdown MD.def $ pack s
+renderMdToHtml :: String -> Html
+renderMdToHtml s = preEscapedToHtml $ commonmarkToHtml [] [] $ T.pack s

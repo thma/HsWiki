@@ -1,7 +1,9 @@
 .stack-work
 .idea
-stack.yaml
+stack.yaml.lock
 root
 *.aes
 *.iml
 cabal.config
+client_session_key.aes
+content/*.md
