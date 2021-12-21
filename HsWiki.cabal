@@ -25,6 +25,7 @@ executable HsWiki
   main-is: Main.hs
   other-modules:
       Util.Config
+      Util.HtmlElements
       Paths_HsWiki
   hs-source-dirs:
       app
