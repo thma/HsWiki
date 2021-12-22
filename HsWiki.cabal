@@ -36,6 +36,7 @@ executable HsWiki
     , cmark-gfm
     , cmdargs
     , directory
+    , extra
     , text
     , yesod
   default-language: Haskell2010

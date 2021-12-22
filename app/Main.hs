@@ -8,8 +8,9 @@ module Main where
 
 import qualified Data.Text                     as T (unpack)
 import           Data.Text.Lazy                (Text, pack, unpack)
-import Data.List ( isPrefixOf )
-import           System.Directory              (doesFileExist, listDirectory)
+import Data.List (isPrefixOf, isSuffixOf, sort )
+import Data.List.Extra
+import           System.Directory              (doesFileExist, listDirectory, pathIsSymbolicLink)
 import           Control.Monad                 (when)
 import System.Console.CmdArgs ()
 import Yesod
@@ -25,7 +26,7 @@ import Yesod
       RenderRoute(renderRoute) )
 import Util.Config ( port, dir, getCommandLineArgs )
 import Util.HtmlElements
-    ( buildViewFor, buildEditorElements, newPage )
+    ( buildViewFor, buildEditorFor, buildIndex, newPage )
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -35,6 +36,7 @@ mkYesod "HsWiki" [parseRoutes|
 /           HomeR   GET
 /#Text      PageR   GET
 /edit/#Text EditR   GET POST
+/actions/index IndexR GET
 |]
 
 instance Yesod HsWiki
@@ -47,7 +49,13 @@ main = do
 
 -- Route Handlers
 getHomeR :: Handler Html
-getHomeR = getPageR "index"
+getHomeR = getPageR "home"
+
+getIndexR :: Handler Html
+getIndexR = do 
+  path <- getDocumentRoot
+  index <- liftIO $ computeIndex path
+  return $ buildIndex index
 
 getPageR :: Text -> Handler Html
 getPageR page = do
@@ -66,7 +74,7 @@ getEditR :: Text -> Handler Html
 getEditR page = do
   path <- getDocumentRoot
   md <- liftIO $ readFile $ fileNameFor path page
-  return $ buildEditorElements page md
+  return $ buildEditorFor page md
 
 postEditR :: Text -> Handler Html
 postEditR page = do
@@ -91,7 +99,7 @@ safeVersion path page = do
   when exists $ do
     content <- readFile fileName
     version <- maxVersion path (unpack page)
-    let newFileName = fileNameFor path $ pack (unpack page ++ version)
+    let newFileName = fileNameFor path (pack (unpack page ++ version)) ++ "~"
     writeFile newFileName content
 
 maxVersion :: FilePath -> String -> IO String
@@ -102,3 +110,19 @@ maxVersion path page = do
 
 fileNameFor :: FilePath -> Text -> String
 fileNameFor path page = path ++ "/" ++ unpack page ++ ".md"
+
+computeIndex :: FilePath -> IO [String]
+computeIndex path = do
+  allFiles <- listDirectory path
+  let filteredPages = filter (not .isSuffixOf ".md~") allFiles
+  let pages = removeAll ["touch", "favicon.ico.md"] filteredPages
+
+  return $ sort $ map (dropSuffix ".md") pages
+
+removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
+removeAll es list = foldl (flip remove) list es
+
+remove :: Eq a => a -> [a] -> [a]
+remove element = filter (/= element)
+
+

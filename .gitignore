@@ -6,5 +6,5 @@ root
 *.iml
 cabal.config
 client_session_key.aes
-content/*.md
+content/*.md*
 tasks.json

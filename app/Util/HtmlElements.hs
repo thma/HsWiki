@@ -1,7 +1,9 @@
-module Util.HtmlElements 
+{-# LANGUAGE OverloadedStrings #-}
+module Util.HtmlElements
   ( buildViewFor
-  , buildEditorElements
-  , newPage 
+  , buildEditorFor
+  , buildIndex
+  , newPage
   )
 where
 
@@ -32,8 +34,8 @@ pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: String)
 buildViewFor :: Text -> String -> Html
 buildViewFor page content = toHtml [pageHeader, menuBar page, renderMdToHtml content, pageFooter]
 
-buildEditorElements :: Text -> String -> Html
-buildEditorElements page markdown =
+buildEditorFor :: Text -> String -> Html
+buildEditorFor page markdown =
     toHtml
       [ pageHeader
       , menuBar page
@@ -44,10 +46,21 @@ buildEditorElements page markdown =
           "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">" ++
           markdown ++ "</textarea>" ++
           "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; " ++
-          "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.location.href='/" ++ unpack page ++ "';\" />" ++     
+          "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.location.href='/" ++ unpack page ++ "';\" />" ++
         "</form>"
       , pageFooter
       ]
+
+buildIndex :: [String] -> Html
+buildIndex index =
+  toHtml 
+  [
+    pageHeader
+  , menuBar ""  
+  , renderMdToHtml $ concatMap (\page -> "- [" ++ page ++ "](/" ++ page ++ ") \n") index
+  , pageFooter
+  ]
+
 
 renderMdToHtml :: String -> Html
 renderMdToHtml s = preEscapedToHtml $ commonmarkToHtml [] [] $ T.pack s
@@ -57,7 +70,8 @@ newPage = "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-
 
 mdMenu :: Text -> String
 mdMenu page =
-  "[home](/) | versions | referenced by | [edit](/edit/" ++
+  "[home](/) | [all pages](/actions/index) | [versions](/actions/versions/" ++ 
+  unpack page ++ ") | referenced by | [edit](/edit/" ++
   unpack page ++
   ") | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n" ++
   "# " ++ unpack page ++ "\r\n"
