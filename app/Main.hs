@@ -26,7 +26,7 @@ import Yesod
       RenderRoute(renderRoute) )
 import Util.Config ( port, dir, getCommandLineArgs )
 import Util.HtmlElements
-    ( buildViewFor, buildEditorFor, buildIndex, buildVersions, newPage )
+    ( buildViewFor, buildEditorFor, buildIndex, buildVersions, buildBackRefs, newPage )
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -38,6 +38,7 @@ mkYesod "HsWiki" [parseRoutes|
 /edit/#Text             EditR     GET POST
 /actions/index          IndexR    GET
 /actions/versions/#Text VersionR  GET
+/actions/backref/#Text  BackRefR  GET
 |]
 
 instance Yesod HsWiki
@@ -63,6 +64,14 @@ getVersionR page = do
   path <- getDocumentRoot
   versions <- liftIO $ computeVersions path page
   return $ buildVersions page versions
+
+getBackRefR :: Text -> Handler Html
+getBackRefR page = do
+  path <- getDocumentRoot
+  allPages <- liftIO $ computeIndex path
+  backRefs <- liftIO $ computeBackRefs path page allPages
+  return $ buildBackRefs page backRefs
+
 
 getPageR :: Text -> Handler Html
 getPageR page = do
@@ -136,6 +145,13 @@ computeVersions path page = do
   let versions = filter (isPrefixOf $ unpack page) allFiles
   return $ sort $ map (dropSuffix ".md") versions
 
+computeBackRefs :: String -> Text -> [String] -> IO [String]
+computeBackRefs path page allPages = do
+  markRefs <- mapM (fmap containsBackref. readFile . fileNameFor path . pack) allPages
+  let pageBoolPairs = zip allPages markRefs
+  return $ map fst (filter snd pageBoolPairs)
+    where
+      containsBackref content = ("](" ++ unpack page  ++ ")") `isInfixOf` content
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
 removeAll es list = foldl (flip remove) list es

@@ -4,6 +4,7 @@ module Util.HtmlElements
   , buildEditorFor
   , buildIndex
   , buildVersions
+  , buildBackRefs
   , newPage
   )
 where
@@ -58,6 +59,7 @@ buildIndex index =
   [
     pageHeader
   , menuBar ""  
+  , renderMdToHtml $ "# All pages in this wiki \n"
   , renderMdToHtml $ concatMap (\page -> "- [" ++ page ++ "](/" ++ page ++ ") \n") index
   , pageFooter
   ]
@@ -67,10 +69,20 @@ buildVersions page versions =
   [
     pageHeader
   , menuBar ""  
+  , renderMdToHtml $ "# Versions of " ++ unpack page ++ "\n"
   , renderMdToHtml $ concatMap (\v -> "- [" ++ v ++ "](/" ++ v ++ ") \n") versions
   , pageFooter
   ]
 
+buildBackRefs page backrefs = 
+  toHtml 
+  [
+    pageHeader
+  , menuBar ""  
+  , renderMdToHtml $ "# References to " ++ unpack page ++ "\n"
+  , renderMdToHtml $ concatMap (\b -> "- [" ++ b ++ "](/" ++ b ++ ") \n") backrefs
+  , pageFooter
+  ]
 
 renderMdToHtml :: String -> Html
 renderMdToHtml s = preEscapedToHtml $ commonmarkToHtml [] [] $ T.pack s
@@ -81,9 +93,9 @@ newPage = "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-
 mdMenu :: Text -> String
 mdMenu page =
   "[home](/) | [all pages](/actions/index) | [versions](/actions/versions/" ++ 
-  unpack page ++ ") | referenced by | " ++ 
+  unpack page ++ ") | "  ++ 
   (if page == ""
-    then "edit" 
-    else "[edit](/edit/" ++ unpack page ++ ")")
-  ++ " | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n" ++
-  "# " ++ unpack page ++ "\r\n"
+    then "referenced by | edit" 
+    else "[referenced by](/actions/backref/" ++  unpack page ++ ") | [edit](/edit/" ++ unpack page ++ ")")
+  ++ " | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n" 
+  -- ++ "# " ++ unpack page ++ "\r\n"
