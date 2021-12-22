@@ -26,17 +26,18 @@ import Yesod
       RenderRoute(renderRoute) )
 import Util.Config ( port, dir, getCommandLineArgs )
 import Util.HtmlElements
-    ( buildViewFor, buildEditorFor, buildIndex, newPage )
+    ( buildViewFor, buildEditorFor, buildIndex, buildVersions, newPage )
 
 newtype HsWiki = HsWiki
   { contentDir :: String
   }
 
 mkYesod "HsWiki" [parseRoutes|
-/           HomeR   GET
-/#Text      PageR   GET
-/edit/#Text EditR   GET POST
-/actions/index IndexR GET
+/                       HomeR     GET
+/#Text                  PageR     GET
+/edit/#Text             EditR     GET POST
+/actions/index          IndexR    GET
+/actions/versions/#Text VersionR  GET
 |]
 
 instance Yesod HsWiki
@@ -52,10 +53,16 @@ getHomeR :: Handler Html
 getHomeR = getPageR "home"
 
 getIndexR :: Handler Html
-getIndexR = do 
+getIndexR = do
   path <- getDocumentRoot
   index <- liftIO $ computeIndex path
   return $ buildIndex index
+
+getVersionR :: Text -> Handler Html
+getVersionR page = do
+  path <- getDocumentRoot
+  versions <- liftIO $ computeVersions path page
+  return $ buildVersions page versions
 
 getPageR :: Text -> Handler Html
 getPageR page = do
@@ -109,15 +116,26 @@ maxVersion path page = do
   return $ "." ++ show versions
 
 fileNameFor :: FilePath -> Text -> String
-fileNameFor path page = path ++ "/" ++ unpack page ++ ".md"
+fileNameFor path page =
+  let p = unpack page
+  in  path ++ "/" ++ p ++
+    if ".md~" `isSuffixOf` p
+      then ""
+      else ".md"
 
 computeIndex :: FilePath -> IO [String]
 computeIndex path = do
   allFiles <- listDirectory path
   let filteredPages = filter (not .isSuffixOf ".md~") allFiles
   let pages = removeAll ["touch", "favicon.ico.md"] filteredPages
-
   return $ sort $ map (dropSuffix ".md") pages
+
+computeVersions :: FilePath -> Text -> IO [String]
+computeVersions path page = do
+  allFiles <- listDirectory path
+  let versions = filter (isPrefixOf $ unpack page) allFiles
+  return $ sort $ map (dropSuffix ".md") versions
+
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
 removeAll es list = foldl (flip remove) list es

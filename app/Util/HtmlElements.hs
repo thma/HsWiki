@@ -3,6 +3,7 @@ module Util.HtmlElements
   ( buildViewFor
   , buildEditorFor
   , buildIndex
+  , buildVersions
   , newPage
   )
 where
@@ -61,6 +62,15 @@ buildIndex index =
   , pageFooter
   ]
 
+buildVersions page versions = 
+  toHtml 
+  [
+    pageHeader
+  , menuBar ""  
+  , renderMdToHtml $ concatMap (\v -> "- [" ++ v ++ "](/" ++ v ++ ") \n") versions
+  , pageFooter
+  ]
+
 
 renderMdToHtml :: String -> Html
 renderMdToHtml s = preEscapedToHtml $ commonmarkToHtml [] [] $ T.pack s
@@ -71,7 +81,9 @@ newPage = "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-
 mdMenu :: Text -> String
 mdMenu page =
   "[home](/) | [all pages](/actions/index) | [versions](/actions/versions/" ++ 
-  unpack page ++ ") | referenced by | [edit](/edit/" ++
-  unpack page ++
-  ") | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n" ++
+  unpack page ++ ") | referenced by | " ++ 
+  (if page == ""
+    then "edit" 
+    else "[edit](/edit/" ++ unpack page ++ ")")
+  ++ " | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n" ++
   "# " ++ unpack page ++ "\r\n"
