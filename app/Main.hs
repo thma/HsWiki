@@ -27,6 +27,7 @@ import Yesod
 import Util.Config ( port, dir, getCommandLineArgs )
 import Util.HtmlElements
     ( buildViewFor, buildEditorFor, buildIndex,  buildBackRefs, newPage )
+import System.Console.CmdArgs.Explicit (HelpFormat)
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -75,13 +76,17 @@ getPageR page = do
       content <- liftIO $ readFile fileName
       return $ buildViewFor page content
     else do
-      liftIO $ writeFile fileName (newPage page)
+      -- liftIO $ writeFile fileName (newPage page)
       redirect $ EditR page
 
 getEditR :: Text -> Handler Html
 getEditR page = do
   path <- getDocumentRoot
-  md <- liftIO $ readFile $ fileNameFor path page
+  let fileName = fileNameFor path page
+  exists <- liftIO $ doesFileExist fileName
+  md <- if exists 
+          then liftIO $ readFile $ fileNameFor path page
+          else return $ newPage page
   return $ buildEditorFor page md
 
 postEditR :: Text -> Handler Html
@@ -109,8 +114,7 @@ fileNameFor path page =
 computeIndex :: FilePath -> IO [String]
 computeIndex path = do
   allFiles <- listDirectory path
-  let filteredPages = filter (not .isSuffixOf ".md~") allFiles
-  let pages = removeAll ["touch", "favicon.ico.md"] filteredPages
+  let pages = removeAll ["touch", "favicon.ico.md"] allFiles
   return $ sort $ map (dropSuffix ".md") pages
 
 computeBackRefs :: String -> Text -> [String] -> IO [String]
@@ -123,8 +127,6 @@ computeBackRefs path page allPages = do
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
 removeAll es list = foldl (flip remove) list es
-
-remove :: Eq a => a -> [a] -> [a]
-remove element = filter (/= element)
-
-
+  where
+    remove :: Eq a => a -> [a] -> [a]
+    remove element = filter (/= element)
