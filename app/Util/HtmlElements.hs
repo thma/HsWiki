@@ -3,7 +3,6 @@ module Util.HtmlElements
   ( buildViewFor
   , buildEditorFor
   , buildIndex
-  , buildVersions
   , buildBackRefs
   , newPage
   )
@@ -59,21 +58,12 @@ buildIndex index =
   [
     pageHeader
   , menuBar ""  
-  , renderMdToHtml $ "# All pages in this wiki \n"
+  , renderMdToHtml "# All pages in this wiki \n"
   , renderMdToHtml $ concatMap (\page -> "- [" ++ page ++ "](/" ++ page ++ ") \n") index
   , pageFooter
   ]
 
-buildVersions page versions = 
-  toHtml 
-  [
-    pageHeader
-  , menuBar ""  
-  , renderMdToHtml $ "# Versions of " ++ unpack page ++ "\n"
-  , renderMdToHtml $ concatMap (\v -> "- [" ++ v ++ "](/" ++ v ++ ") \n") versions
-  , pageFooter
-  ]
-
+buildBackRefs :: Text -> [String] -> Html
 buildBackRefs page backrefs = 
   toHtml 
   [
@@ -87,13 +77,15 @@ buildBackRefs page backrefs =
 renderMdToHtml :: String -> Html
 renderMdToHtml s = preEscapedToHtml $ commonmarkToHtml [] [] $ T.pack s
 
-newPage :: String
-newPage = "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
+newPage :: Text -> String
+newPage page = 
+  "[### Be the first to edit this page](/edit/" ++ unpack page ++ ") \n\n" ++
+  "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
 
 mdMenu :: Text -> String
 mdMenu page =
-  "[home](/) | [all pages](/actions/index) | [versions](/actions/versions/" ++ 
-  unpack page ++ ") | "  ++ 
+  "[home](/) | [all pages](/actions/index) | " ++ 
+  -- "[versions](/actions/versions/" ++ unpack page ++ ") | "  ++ 
   (if page == ""
     then "referenced by | edit" 
     else "[referenced by](/actions/backref/" ++  unpack page ++ ") | [edit](/edit/" ++ unpack page ++ ")")

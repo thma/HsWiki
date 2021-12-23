@@ -9,7 +9,7 @@ module Main where
 import qualified Data.Text                     as T (unpack)
 import           Data.Text.Lazy                (Text, pack, unpack)
 import Data.List (isPrefixOf, isSuffixOf, sort )
-import Data.List.Extra
+import Data.List.Extra ( isInfixOf, isSuffixOf, sort, dropSuffix )
 import           System.Directory              (doesFileExist, listDirectory, pathIsSymbolicLink)
 import           Control.Monad                 (when)
 import System.Console.CmdArgs ()
@@ -26,7 +26,7 @@ import Yesod
       RenderRoute(renderRoute) )
 import Util.Config ( port, dir, getCommandLineArgs )
 import Util.HtmlElements
-    ( buildViewFor, buildEditorFor, buildIndex, buildVersions, buildBackRefs, newPage )
+    ( buildViewFor, buildEditorFor, buildIndex,  buildBackRefs, newPage )
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -37,7 +37,6 @@ mkYesod "HsWiki" [parseRoutes|
 /#Text                  PageR     GET
 /edit/#Text             EditR     GET POST
 /actions/index          IndexR    GET
-/actions/versions/#Text VersionR  GET
 /actions/backref/#Text  BackRefR  GET
 |]
 
@@ -59,19 +58,12 @@ getIndexR = do
   index <- liftIO $ computeIndex path
   return $ buildIndex index
 
-getVersionR :: Text -> Handler Html
-getVersionR page = do
-  path <- getDocumentRoot
-  versions <- liftIO $ computeVersions path page
-  return $ buildVersions page versions
-
 getBackRefR :: Text -> Handler Html
 getBackRefR page = do
   path <- getDocumentRoot
   allPages <- liftIO $ computeIndex path
   backRefs <- liftIO $ computeBackRefs path page allPages
   return $ buildBackRefs page backRefs
-
 
 getPageR :: Text -> Handler Html
 getPageR page = do
@@ -83,7 +75,7 @@ getPageR page = do
       content <- liftIO $ readFile fileName
       return $ buildViewFor page content
     else do
-      liftIO $ writeFile fileName newPage
+      liftIO $ writeFile fileName (newPage page)
       redirect $ EditR page
 
 getEditR :: Text -> Handler Html
@@ -98,31 +90,13 @@ postEditR page = do
   let fileName = fileNameFor path page
   maybeContent <- lookupPostParam "content"
   case maybeContent of
-    Just content -> liftIO $ do
-      safeVersion path page
-      writeFile fileName $ T.unpack content
+    Just content -> liftIO $ writeFile fileName $ T.unpack content
     Nothing -> redirect $ PageR page
   redirect $ PageR page
 
 -- helper functions
 getDocumentRoot :: Handler String
 getDocumentRoot = getsYesod contentDir
-
-safeVersion :: FilePath -> Text -> IO ()
-safeVersion path page = do
-  let fileName = fileNameFor path page
-  exists <- doesFileExist fileName
-  when exists $ do
-    content <- readFile fileName
-    version <- maxVersion path (unpack page)
-    let newFileName = fileNameFor path (pack (unpack page ++ version)) ++ "~"
-    writeFile newFileName content
-
-maxVersion :: FilePath -> String -> IO String
-maxVersion path page = do
-  allFiles <- listDirectory path
-  let versions = length $ filter (isPrefixOf page) allFiles
-  return $ "." ++ show versions
 
 fileNameFor :: FilePath -> Text -> String
 fileNameFor path page =
@@ -138,12 +112,6 @@ computeIndex path = do
   let filteredPages = filter (not .isSuffixOf ".md~") allFiles
   let pages = removeAll ["touch", "favicon.ico.md"] filteredPages
   return $ sort $ map (dropSuffix ".md") pages
-
-computeVersions :: FilePath -> Text -> IO [String]
-computeVersions path page = do
-  allFiles <- listDirectory path
-  let versions = filter (isPrefixOf $ unpack page) allFiles
-  return $ sort $ map (dropSuffix ".md") versions
 
 computeBackRefs :: String -> Text -> [String] -> IO [String]
 computeBackRefs path page allPages = do
