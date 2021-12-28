@@ -2,42 +2,40 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeFamilies      #-}
-{-# LANGUAGE ViewPatterns      #-}
 
 module Main where
 
-import qualified Data.Text                     as T (unpack)
-import           Data.Text.Lazy                (Text, pack, unpack)
-import Data.List (isPrefixOf, isSuffixOf, sort )
-import Data.List.Extra ( isInfixOf, isSuffixOf, sort, dropSuffix )
-import           System.Directory              (doesFileExist, listDirectory, pathIsSymbolicLink)
-import           Control.Monad                 (when)
-import System.Console.CmdArgs ()
-import Yesod
-    ( Html,
-      warp,
-      getsYesod,
-      lookupPostParam,
-      redirect,
-      mkYesod,
-      parseRoutes,
-      MonadIO(liftIO),
-      Yesod,
-      RenderRoute(renderRoute) )
-import Util.Config ( port, dir, getCommandLineArgs )
-import Util.HtmlElements
-    ( buildViewFor, buildEditorFor, buildIndex,  buildBackRefs, newPage )
-import System.Console.CmdArgs.Explicit (HelpFormat)
+import           Control.Monad                   (when)
+import           Data.List                       (isPrefixOf, isSuffixOf, sort)
+import           Data.List.Extra                 (dropSuffix, isInfixOf,
+                                                  isSuffixOf, sort)
+import qualified Data.Text                       as T (unpack)
+import           Data.Text.Lazy                  (Text, pack, unpack)
+import           System.Console.CmdArgs          ()
+import           System.Console.CmdArgs.Explicit (HelpFormat)
+import           System.Directory                (doesFileExist, listDirectory,
+                                                  pathIsSymbolicLink)
+import           Util.Config                     (dir, getCommandLineArgs, port)
+import           Util.HtmlElements               (buildBackRefs, buildEditorFor,
+                                                  buildIndex, buildViewFor,
+                                                  newPage)
+import           Yesod                           (Html, MonadIO (liftIO),
+                                                  RenderRoute (renderRoute),
+                                                  Yesod, getsYesod,
+                                                  lookupPostParam, mkYesod,
+                                                  parseRoutes, redirect, warp)
 
 newtype HsWiki = HsWiki
   { contentDir :: String
   }
 
-mkYesod "HsWiki" [parseRoutes|
+mkYesod
+  "HsWiki"
+  [parseRoutes|
 /                       HomeR     GET
 /#Text                  PageR     GET
 /edit/#Text             EditR     GET POST
-/actions/index          IndexR    GET
+/actions/toc            IndexR    GET
 /actions/backref/#Text  BackRefR  GET
 |]
 
@@ -84,9 +82,10 @@ getEditR page = do
   path <- getDocumentRoot
   let fileName = fileNameFor path page
   exists <- liftIO $ doesFileExist fileName
-  md <- if exists 
-          then liftIO $ readFile $ fileNameFor path page
-          else return $ newPage page
+  md <-
+    if exists
+      then liftIO $ readFile $ fileNameFor path page
+      else return $ newPage page
   return $ buildEditorFor page md
 
 postEditR :: Text -> Handler Html
@@ -96,7 +95,7 @@ postEditR page = do
   maybeContent <- lookupPostParam "content"
   case maybeContent of
     Just content -> liftIO $ writeFile fileName $ T.unpack content
-    Nothing -> redirect $ PageR page
+    Nothing      -> redirect $ PageR page
   redirect $ PageR page
 
 -- helper functions
@@ -106,10 +105,10 @@ getDocumentRoot = getsYesod contentDir
 fileNameFor :: FilePath -> Text -> String
 fileNameFor path page =
   let p = unpack page
-  in  path ++ "/" ++ p ++
-    if ".md~" `isSuffixOf` p
-      then ""
-      else ".md"
+   in path ++ "/" ++ p
+        ++ if ".md~" `isSuffixOf` p
+          then ""
+          else ".md"
 
 computeIndex :: FilePath -> IO [String]
 computeIndex path = do
@@ -119,11 +118,11 @@ computeIndex path = do
 
 computeBackRefs :: String -> Text -> [String] -> IO [String]
 computeBackRefs path page allPages = do
-  markRefs <- mapM (fmap containsBackref. readFile . fileNameFor path . pack) allPages
+  markRefs <- mapM (fmap containsBackref . readFile . fileNameFor path . pack) allPages
   let pageBoolPairs = zip allPages markRefs
   return $ map fst (filter snd pageBoolPairs)
-    where
-      containsBackref content = ("](" ++ unpack page  ++ ")") `isInfixOf` content
+  where
+    containsBackref content = ("](" ++ unpack page ++ ")") `isInfixOf` content
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
 removeAll es list = foldl (flip remove) list es
