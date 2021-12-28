@@ -2,19 +2,16 @@
 {-# LANGUAGE QuasiQuotes       #-}
 {-# LANGUAGE TemplateHaskell   #-}
 {-# LANGUAGE TypeFamilies      #-}
+{-# LANGUAGE ViewPatterns #-}
 
 module Main where
 
-import           Control.Monad                   (when)
-import           Data.List                       (isPrefixOf, isSuffixOf, sort)
-import           Data.List.Extra                 (dropSuffix, isInfixOf,
-                                                  isSuffixOf, sort)
+import           Data.List                       (isSuffixOf, sort)
+import           Data.List.Extra                 (dropSuffix, isInfixOf)
 import qualified Data.Text                       as T (unpack)
 import           Data.Text.Lazy                  (Text, pack, unpack)
 import           System.Console.CmdArgs          ()
-import           System.Console.CmdArgs.Explicit (HelpFormat)
-import           System.Directory                (doesFileExist, listDirectory,
-                                                  pathIsSymbolicLink)
+import           System.Directory                (doesFileExist, listDirectory)
 import           Util.Config                     (dir, getCommandLineArgs, port)
 import           Util.HtmlElements               (buildBackRefs, buildEditorFor,
                                                   buildIndex, buildViewFor,
@@ -29,9 +26,7 @@ newtype HsWiki = HsWiki
   { contentDir :: String
   }
 
-mkYesod
-  "HsWiki"
-  [parseRoutes|
+mkYesod "HsWiki" [parseRoutes|
 /                       HomeR     GET
 /#Text                  PageR     GET
 /edit/#Text             EditR     GET POST
