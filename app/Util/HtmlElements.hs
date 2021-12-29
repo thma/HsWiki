@@ -24,7 +24,7 @@ pageHeader =
   preEscapedToHtml $
     "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n"
       ++ "<title>HsWiki</title>\r\n"
-      ++ "<meta charset=\"UTF-8\">\r\n"      
+      ++ "<meta charset=\"UTF-8\">\r\n"
       ++ "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\"> \n"
       ++ "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css\"> \n"
       ++ "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.css\"> \n"
@@ -90,17 +90,17 @@ buildGraphView graph =
 
 
 renderGraph :: [([String], String)] -> String
-renderGraph graph = 
-  foldr (\str -> ((str ++ ",\n") ++)) "" 
+renderGraph graph =
+  foldr (\str -> ((str ++ ",\n") ++)) ""
     (concatMap (\(sources, target) -> map (\s -> "'\"" ++ s ++ "\" -> \"" ++ target ++ "\";'") sources) graph)
 
 allNodes :: [([String], String)] -> [String]
 allNodes = nub . (uncurry (flip (:)) =<<)
 
 renderNodes :: [String] -> String
-renderNodes = 
-  concatMap (\n -> "'\"" ++ n ++ 
-    "\" [style=\"filled\", fillcolor=\"#f4f5f6\", fontcolor=\"#9b4dca\", fontname=\"Roboto\",  URL=\"/" ++ 
+renderNodes =
+  concatMap (\n -> "'\"" ++ n ++
+    "\" [shape=\"rect\", style=\"rounded,filled\", fillcolor=\"#f4f5f6\", fontcolor=\"#9b4dca\", fontname=\"Roboto\",  URL=\"/" ++
     n ++ "\"];', \n")
 
 top :: Html
