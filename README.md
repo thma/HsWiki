@@ -1,19 +1,26 @@
 # HsWiki
-Simple Wiki in the spirit of the legendary C2-Wiki - written in haskell with yesod
+Simple Wiki in the spirit of the legendary [C2-Wiki](http://wiki.c2.com/) - written in Haskell with the Yesod framework.
 
-# Features
-* Markup of wiki content is done with good old MarkDown.
+## Features
+* Markup of wiki content is done with (Github flavoured) MarkDown.
 * Automatic generation of new pages if non-existing local links are followed by the browser.
   (So to generate a new page just create a new link [new page](new_page) and click the new link.)
+* An automatically generated table of contents is available
+* For each page it's possible to view a list of all other pages linking back to it.
 
-# Todos
-* Configuration through yaml file & defaults
-* ssh
-* authentication
-* index of all pages
-* crossreference index
-* store file versions
-* use a document db as persistent backend / make it pluggable
+## Abstract 
+The [C2-Wiki](http://wiki.c2.com/) was one of the earliest incarnations of a collaborative hypertext platform on the internet.
+It had a very reduced set of features which still proved to provide the essential tools required to create a large content base
+with a dense hyperlink structure. Editing and creating new pages was extremely simple which fostered free contributions 
+and a high frequency of interactions between participants.
+
+In this blog posts I'm presenting an implementation of a Wiki System that emulates some of the most important 
+features of the C2-Wiki system.
+
+
+
+
+
 
 ## How to build
     stack init

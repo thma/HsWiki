@@ -37,6 +37,10 @@ executable HsWiki
     , cmdargs
     , directory
     , extra
+    , iproute
+    , network
     , text
+    , time
+    , wai
     , yesod
   default-language: Haskell2010

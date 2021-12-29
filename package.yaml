@@ -23,6 +23,10 @@ dependencies:
 - cmdargs
 - cmark-gfm
 - extra
+- time
+- network
+- wai
+- iproute
 
 
 executables:

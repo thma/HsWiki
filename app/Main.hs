@@ -15,12 +15,15 @@ import           System.Directory                (doesFileExist, listDirectory)
 import           Util.Config                     (dir, getCommandLineArgs, port)
 import           Util.HtmlElements               (buildBackRefs, buildEditorFor,
                                                   buildIndex, buildViewFor,
-                                                  newPage)
+                                                  buildGraphView, newPage)
 import           Yesod                           (Html, MonadIO (liftIO),
                                                   RenderRoute (renderRoute),
                                                   Yesod, getsYesod,
                                                   lookupPostParam, mkYesod,
-                                                  parseRoutes, redirect, warp)
+                                                  parseRoutes, redirect, warp, waiRequest)
+import           Data.Time.Clock                 (getCurrentTime )
+import           Network.Wai
+import           Network.Socket                  (SockAddr(..) )
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -30,8 +33,9 @@ mkYesod "HsWiki" [parseRoutes|
 /                       HomeR     GET
 /#Text                  PageR     GET
 /edit/#Text             EditR     GET POST
-/actions/toc            IndexR    GET
 /actions/backref/#Text  BackRefR  GET
+/actions/graph          GraphR    GET
+/actions/toc            IndexR    GET
 |]
 
 instance Yesod HsWiki
@@ -59,6 +63,13 @@ getBackRefR page = do
   backRefs <- liftIO $ computeBackRefs path page allPages
   return $ buildBackRefs page backRefs
 
+getGraphR :: Handler Html
+getGraphR = do
+  path <- getDocumentRoot
+  allPages <- liftIO $ computeIndex path
+  allRefs  <- liftIO $  mapM (\p -> computeBackRefs path (pack p) allPages) allPages
+  return $ buildGraphView $ zip allRefs allPages
+
 getPageR :: Text -> Handler Html
 getPageR page = do
   path <- getDocumentRoot
@@ -69,7 +80,6 @@ getPageR page = do
       content <- liftIO $ readFile fileName
       return $ buildViewFor page content
     else do
-      -- liftIO $ writeFile fileName (newPage page)
       redirect $ EditR page
 
 getEditR :: Text -> Handler Html
@@ -88,10 +98,22 @@ postEditR page = do
   path <- getDocumentRoot
   let fileName = fileNameFor path page
   maybeContent <- lookupPostParam "content"
+  client <- remoteHost <$> waiRequest
   case maybeContent of
-    Just content -> liftIO $ writeFile fileName $ T.unpack content
+    Just content -> liftIO $ do 
+      writeFile fileName $ T.unpack content
+      writeLogEntry path page client
     Nothing      -> redirect $ PageR page
   redirect $ PageR page
+  
+writeLogEntry :: FilePath -> Text -> SockAddr -> IO ()
+writeLogEntry path page client = do
+  let logFile = fileNameFor path "RecentChanges"
+  now <- getCurrentTime
+  let logEntry = "- [" ++ unpack page ++ "](" ++ unpack page ++ ") " ++ 
+        takeWhile (/= '.') (show now) ++ " from " ++ 
+        takeWhile (/= ':') (show client) ++ "\n"
+  appendFile logFile logEntry
 
 -- helper functions
 getDocumentRoot :: Handler String
@@ -108,7 +130,7 @@ fileNameFor path page =
 computeIndex :: FilePath -> IO [String]
 computeIndex path = do
   allFiles <- listDirectory path
-  let pages = removeAll ["touch", "favicon.ico.md"] allFiles
+  let pages = removeAll ["touch", "favicon.ico.md", "RecentChanges.md"] allFiles
   return $ sort $ map (dropSuffix ".md") pages
 
 computeBackRefs :: String -> Text -> [String] -> IO [String]
@@ -120,7 +142,7 @@ computeBackRefs path page allPages = do
     containsBackref content = ("](" ++ unpack page ++ ")") `isInfixOf` content
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
-removeAll es list = foldl (flip remove) list es
+removeAll = flip (foldl (flip remove))
   where
     remove :: Eq a => a -> [a] -> [a]
-    remove element = filter (/= element)
+    remove = filter . (/=)

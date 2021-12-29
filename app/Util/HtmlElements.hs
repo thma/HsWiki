@@ -5,6 +5,7 @@ module Util.HtmlElements
     buildEditorFor,
     buildIndex,
     buildBackRefs,
+    buildGraphView,
     newPage,
   )
 where
@@ -13,6 +14,7 @@ import           CMarkGFM                      (commonmarkToHtml)
 import qualified Data.Text                     as T (pack)
 import           Data.Text.Lazy                (Text, unpack)
 import           Text.Blaze.Html               (Html, preEscapedToHtml, toHtml)
+import           Data.List                     (nub)
 
 menuBar :: Text -> Html
 menuBar page = renderMdToHtml $ mdMenu page
@@ -22,10 +24,10 @@ pageHeader =
   preEscapedToHtml $
     "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n"
       ++ "<title>HsWiki</title>\r\n"
-      ++ "<meta charset=\"UTF-8\">\r\n"
-      ++ "<link rel=\"stylesheet\" href=\"//fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\">\r\n"
-      ++ "<link rel=\"stylesheet\" href=\"//cdn.rawgit.com/necolas/normalize.css/master/normalize.css\">\r\n"
-      ++ "<link rel=\"stylesheet\" href=\"//cdn.rawgit.com/milligram/milligram/master/dist/milligram.min.css\">\r\n"
+      ++ "<meta charset=\"UTF-8\">\r\n"      
+      ++ "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\"> \n"
+      ++ "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css\"> \n"
+      ++ "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.css\"> \n"
       ++ "</head>\r\n<body>\r\n<div class=\"container\">\r\n"
 
 pageFooter :: Html
@@ -47,9 +49,7 @@ buildEditorFor page markdown =
           ++ markdown
           ++ "</textarea>"
           ++ "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; "
-          ++ "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.location.href='/"
-          ++ unpack page
-          ++ "';\" />"
+          ++ "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
           ++ "</form>",
       pageFooter
     ]
@@ -74,8 +74,56 @@ buildBackRefs page backrefs =
       pageFooter
     ]
 
+buildGraphView :: [([String],String)] -> Html
+buildGraphView graph =
+  toHtml
+    [ pageHeader,
+      menuBar "",
+      renderMdToHtml "# Site Map \n",
+      renderMdToHtml "[View as List](/actions/toc) \n",
+      top,
+      preEscapedToHtml $ renderNodes $ allNodes graph,
+      preEscapedToHtml $ renderGraph graph,
+      bottom,
+      pageFooter
+    ]
+
+
+renderGraph :: [([String], String)] -> String
+renderGraph graph = 
+  foldr (\str -> ((str ++ ",\n") ++)) "" 
+    (concatMap (\(sources, target) -> map (\s -> "'\"" ++ s ++ "\" -> \"" ++ target ++ "\";'") sources) graph)
+
+allNodes :: [([String], String)] -> [String]
+allNodes = nub . (uncurry (flip (:)) =<<)
+
+renderNodes :: [String] -> String
+renderNodes = 
+  concatMap (\n -> "'\"" ++ n ++ 
+    "\" [style=\"filled\", fillcolor=\"#f4f5f6\", fontcolor=\"#9b4dca\", fontname=\"Roboto\",  URL=\"/" ++ 
+    n ++ "\"];', \n")
+
+top :: Html
+top = preEscapedToHtml $
+      "<script src=\"//d3js.org/d3.v5.min.js\"></script>" ++
+      "<script src=\"https://unpkg.com/@hpcc-js/wasm@0.3.11/dist/index.min.js\"></script>" ++
+      "<script src=\"https://unpkg.com/d3-graphviz@3.0.5/build/d3-graphviz.js\"></script>" ++
+      "<div id=\"graph\" ></div>" ++
+      "<script>" ++
+      "var dot =\n" ++
+      "    [\n" ++
+      "        'digraph  {',\n"
+
+bottom = preEscapedToHtml $ "        '}'\n" ++
+         "     ];\n" ++
+         " \n" ++
+         " d3.select(\"#graph\").graphviz()\n" ++
+         "     .renderDot(dot.join(''));\n" ++
+         " \n" ++
+         " </script>\n"
+
 renderMdToHtml :: String -> Html
-renderMdToHtml s = preEscapedToHtml $ commonmarkToHtml [] [] $ T.pack s
+renderMdToHtml = preEscapedToHtml . commonmarkToHtml [] [] . T.pack
 
 newPage :: Text -> String
 newPage page =
@@ -87,7 +135,7 @@ newPage page =
 
 mdMenu :: Text -> String
 mdMenu page =
-  "[home](/) | [table of contents](/actions/toc) | "
+  "[home](/) | [site map](/actions/graph) |  [recent changes](/RecentChanges) | "
     ++ ( if page == ""
            then "referenced by | edit"
            else "[referenced by](/actions/backref/" ++ unpack page ++ ") | [edit](/edit/" ++ unpack page ++ ")"
