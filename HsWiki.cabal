@@ -40,6 +40,8 @@ executable HsWiki
     , iproute
     , network
     , text
+    , text-icu
+    , text-regex-replace
     , time
     , wai
     , yesod

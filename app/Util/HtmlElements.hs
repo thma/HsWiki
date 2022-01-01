@@ -11,8 +11,8 @@ module Util.HtmlElements
 where
 
 import           CMarkGFM                      (commonmarkToHtml)
-import qualified Data.Text                     as T (pack)
-import           Data.Text.Lazy                (Text, unpack)
+import qualified Data.Text                     as T (pack, unpack)
+import           Data.Text                     (Text)
 import           Text.Blaze.Html               (Html, preEscapedToHtml, toHtml)
 import           Data.List                     (nub)
 
@@ -33,20 +33,20 @@ pageHeader =
 pageFooter :: Html
 pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: String)
 
-buildViewFor :: Text -> String -> Html
+buildViewFor :: Text -> Text -> Html
 buildViewFor page content = toHtml [pageHeader, menuBar page, renderMdToHtml content, pageFooter]
 
-buildEditorFor :: Text -> String -> Html
+buildEditorFor :: Text -> Text -> Html
 buildEditorFor page markdown =
   toHtml
     [ pageHeader,
       menuBar page,
       preEscapedToHtml $
         "<form action=\""
-          ++ unpack page
+          ++ T.unpack page
           ++ "\" method=\"POST\">"
           ++ "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">"
-          ++ markdown
+          ++ T.unpack markdown
           ++ "</textarea>"
           ++ "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; "
           ++ "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
@@ -60,17 +60,17 @@ buildIndex index =
     [ pageHeader,
       menuBar "",
       renderMdToHtml "# Table of contents \n",
-      renderMdToHtml $ concatMap (\page -> "- [" ++ page ++ "](/" ++ page ++ ") \n") index,
+      renderMdToHtml $ T.pack $ concatMap (\page -> "- [" ++ page ++ "](/" ++ page ++ ") \n") index,
       pageFooter
     ]
 
-buildBackRefs :: Text -> [String] -> Html
+buildBackRefs :: FilePath -> [String] -> Html
 buildBackRefs page backrefs =
   toHtml
     [ pageHeader,
       menuBar "",
-      renderMdToHtml $ "# References to " ++ unpack page ++ "\n",
-      renderMdToHtml $ concatMap (\b -> "- [" ++ b ++ "](/" ++ b ++ ") \n") backrefs,
+      renderMdToHtml $ T.pack $ "# References to " ++ page ++ "\n",
+      renderMdToHtml $ T.pack $ concatMap (\b -> "- [" ++ b ++ "](/" ++ b ++ ") \n") backrefs,
       pageFooter
     ]
 
@@ -122,22 +122,22 @@ bottom = preEscapedToHtml $ "        '}'\n" ++
          " \n" ++
          " </script>\n"
 
-renderMdToHtml :: String -> Html
-renderMdToHtml = preEscapedToHtml . commonmarkToHtml [] [] . T.pack
+renderMdToHtml :: Text -> Html
+renderMdToHtml = preEscapedToHtml . commonmarkToHtml [] [] 
 
-newPage :: Text -> String
-newPage page =
-  "# " ++ unpack page ++ "\n\n"
+newPage :: Text -> Text
+newPage page = T.pack $
+  "# " ++ T.unpack page ++ "\n\n"
     ++ "### [Be the first to edit this page](/edit/"
-    ++ unpack page
+    ++ T.unpack page
     ++ ") \n\n"
     ++ "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
 
-mdMenu :: Text -> String
-mdMenu page =
+mdMenu :: Text -> Text
+mdMenu page = T.pack $
   "[home](/) | [site map](/actions/graph) |  [recent changes](/RecentChanges) | "
     ++ ( if page == ""
            then "referenced by | edit"
-           else "[referenced by](/actions/backref/" ++ unpack page ++ ") | [edit](/edit/" ++ unpack page ++ ")"
+           else "[referenced by](/actions/backref/" ++ T.unpack page ++ ") | [edit](/edit/" ++ T.unpack page ++ ")"
        )
     ++ " | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n"

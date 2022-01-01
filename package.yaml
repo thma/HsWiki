@@ -27,6 +27,8 @@ dependencies:
 - network
 - wai
 - iproute
+- text-icu
+- text-regex-replace
 
 
 executables:

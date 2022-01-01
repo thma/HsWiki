@@ -8,14 +8,27 @@ Simple Wiki in the spirit of the legendary [C2-Wiki](http://wiki.c2.com/) - writ
 * An automatically generated table of contents is available
 * For each page it's possible to view a list of all other pages linking back to it.
 
-## Abstract 
-The [C2-Wiki](http://wiki.c2.com/) was one of the earliest incarnations of a collaborative hypertext platform on the internet.
-It had a very reduced set of features which still proved to provide the essential tools required to create a large content base
-with a dense hyperlink structure. Editing and creating new pages was extremely simple which fostered free contributions 
-and a high frequency of interactions between participants.
+## Introduction 
 
-In this blog posts I'm presenting an implementation of a Wiki System that emulates some of the most important 
-features of the C2-Wiki system.
+> A wiki is a hypertext publication collaboratively edited and managed by its own audience directly using a web browser.
+
+[cited from Wikipedia](https://en.wikipedia.org/wiki/Wiki)
+
+> The WikiWikiWeb is the first wiki, or user-editable website. It was launched on 25 March 1995 by its inventor, programmer Ward Cunningham, to accompany the Portland Pattern Repository website discussing software design patterns. 
+
+[cited from Wikipedia](https://en.wikipedia.org/wiki/WikiWikiWeb)
+
+
+The [WikiWiki](http://wiki.c2.com/) was the earliest incarnation of a collaborative hypertext platform on the internet.
+It started with reduced set of features which proved to provide the essential tools required to create a large content base with a dense hyperlink structure. Editing and creating new pages was extremely simple which fostered free contributions and a high frequency of interactions between participants.
+
+In this blog posts I'm presenting a Haskell implementation of a Wiki System that emulates some of the most important features of the C2-Wiki system:
+
+- A simple inplace editor that allows adhoc creation and editing of pages.
+- A wiki markup language that allows basic adjustments of typography and layout.
+- On saving the markup is translated to HTML and displayed in the Browser
+- The RecentChanges page shows the latest creation and edits to pages and thus makes it easy to identify hot topics
+- It is possible to show all references to a page. This allows to identify related topics and also to organize semantic networks by creating category pages that just keep links to all pages in the category [CategoryCategory](http://wiki.c2.com/?CategoryCategory)
 
 
 
