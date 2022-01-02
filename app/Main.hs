@@ -20,38 +20,23 @@ import           Yesod                           (Html, MonadIO (liftIO),
                                                   RenderRoute (renderRoute),
                                                   Yesod, getsYesod,
                                                   lookupPostParam, mkYesod,
-                                                  parseRoutes, redirect, warp, waiRequest, PathPiece (fromPathPiece, toPathPiece))
+                                                  parseRoutes, redirect, warp, waiRequest)
 import           Data.Time.Clock                 (getCurrentTime )
 import           Network.Wai
 import           Network.Socket                  (SockAddr(..) )
-import           CMarkGFM
+--import CMarkGFM ( commonmarkToNode )
 import  Data.Text.IO                    as TIO
-import Data.Text.ICU.Replace
-import Data.Text.ICU ( Regex, find) 
 import Data.Maybe (fromMaybe)
-import Data.Text.ICU.Regex (clone)
+import PageName
 
 
 newtype HsWiki = HsWiki
   { contentDir :: String
   }
 
-newtype PageName = Page String deriving (Eq, Read, Show)
-
-instance PathPiece PageName where
-  toPathPiece page   = asText page
-  fromPathPiece text = Just $ Page (T.unpack text)
-
-
-asText :: PageName -> Text
-asText (Page name) = T.pack name
-
-asString :: PageName -> String
-asString (Page name) = name
-
 mkYesod "HsWiki" [parseRoutes|
 /                       HomeR     GET
-/#PageName                  PageR     GET
+/#PageName              PageR     GET
 /edit/#PageName             EditR     GET POST
 /actions/backref/#PageName   BackRefR  GET
 /actions/graph          GraphR    GET
@@ -170,19 +155,15 @@ computeBackRefs path page allPages = do
                       then pageT
                       else T.concat ["](", pageT, ")"]
       in pageRef `T.isInfixOf` content
-    isWikiWord pageName = 
-      case find wikiWordMatch pageName of
-        Nothing -> False
-        Just _  -> True
 
 
-computeForwardRefs :: FilePath -> FilePath -> IO [String]
-computeForwardRefs path page = do
-  content <- TIO.readFile (fileNameFor path page)
-  let text = content
-  let node = commonmarkToNode [] [] text
-  print node
-  return undefined
+-- computeForwardRefs :: FilePath -> FilePath -> IO [String]
+-- computeForwardRefs path page = do
+--   content <- TIO.readFile (fileNameFor path page)
+--   let text = content
+--   let node = commonmarkToNode [] [] text
+--   print node
+--   return undefined
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
 removeAll = flip (foldl (flip remove))
@@ -190,13 +171,5 @@ removeAll = flip (foldl (flip remove))
     remove :: Eq a => a -> [a] -> [a]
     remove = filter . (/=)
 
--- | converts a WikiWord into a Markdown link: [WikiWord](WikiWord)
-wikiWordToMdLink :: Text -> Text
-wikiWordToMdLink text = 
-  let match   = wikiWordMatch 
-      replace = "[$0]($0)"
-  in  replaceAll match replace text
 
--- | the magic WikiWord Regex
-wikiWordMatch :: Regex
-wikiWordMatch = "(?<![\\(\\[])(([A-Z][a-z0-9]+){2,})(?![\\)\\]])"
+
