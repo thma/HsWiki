@@ -6,41 +6,39 @@
 
 module Main where
 
-import           Data.List                       (isSuffixOf, sort)
-import           Data.List.Extra                 (dropSuffix, isInfixOf)
-import qualified Data.Text                       as T (pack, unpack, isInfixOf, concat)
-import           Data.Text                       (Text)
-import           System.Console.CmdArgs          ()
-import           System.Directory                (doesFileExist, listDirectory)
-import           Util.Config                     (dir, getCommandLineArgs, port)
-import           Util.HtmlElements               (buildBackRefs, buildEditorFor,
-                                                  buildIndex, buildViewFor,
-                                                  buildGraphView, newPage)
-import           Yesod                           (Html, MonadIO (liftIO),
-                                                  RenderRoute (renderRoute),
-                                                  Yesod, getsYesod,
-                                                  lookupPostParam, mkYesod,
-                                                  parseRoutes, redirect, warp, waiRequest)
-import           Data.Time.Clock                 (getCurrentTime )
-import           Network.Wai
-import           Network.Socket                  (SockAddr(..) )
---import CMarkGFM ( commonmarkToNode )
-import  Data.Text.IO                    as TIO
-import Data.Maybe (fromMaybe)
-import PageName
-
+import           Data.List              (isSuffixOf, sort)
+import           Data.List.Extra        (dropSuffix, isInfixOf)
+import           Data.Text              (Text)
+import qualified Data.Text              as T (concat, isInfixOf, pack, unpack)
+import           Data.Text.IO           as TIO (appendFile, putStrLn, readFile,
+                                                writeFile)
+import           Data.Time.Clock        (getCurrentTime)
+import           Network.Socket         (SockAddr (..))
+import           Network.Wai            (Request (remoteHost))
+import           PageName               (PageName (..), asString, asText,
+                                         wikiWordToMdLink)
+import           System.Console.CmdArgs ()
+import           System.Directory       (doesFileExist, listDirectory)
+import           Util.Config            (dir, getCommandLineArgs, port)
+import           Util.HtmlElements      (buildBackRefs, buildEditorFor,
+                                         buildGraphView, buildIndex,
+                                         buildViewFor, newPage)
+import           Yesod                  (Html, MonadIO (liftIO),
+                                         RenderRoute (renderRoute), Yesod,
+                                         getsYesod, lookupGetParam,
+                                         lookupPostParam, mkYesod, parseRoutes,
+                                         redirect, waiRequest, warp)
 
 newtype HsWiki = HsWiki
   { contentDir :: String
   }
 
 mkYesod "HsWiki" [parseRoutes|
-/                       HomeR     GET
-/#PageName              PageR     GET
-/edit/#PageName             EditR     GET POST
-/actions/backref/#PageName   BackRefR  GET
-/actions/graph          GraphR    GET
-/actions/toc            IndexR    GET
+/               HomeR     GET
+/#PageName      PageR     GET
+/edit/#PageName EditR     GET POST
+/actions/graph  GraphR    GET
+/actions/toc    IndexR    GET
 |]
 
 instance Yesod HsWiki
@@ -73,26 +71,28 @@ getGraphR :: Handler Html
 getGraphR = do
   path <- getDocumentRoot
   allPages <- liftIO $ computeIndex path
-  allRefs  <- liftIO $  mapM (\p -> computeBackRefs path p allPages) allPages
+  allRefs <- liftIO $ mapM (\p -> computeBackRefs path p allPages) allPages
   return $ buildGraphView $ zip allRefs allPages
 
 getPageR :: PageName -> Handler Html
 getPageR page = do
   path <- getDocumentRoot
+  maybeShowRefs <- lookupGetParam "showBackrefs"
+  maybeBackrefs <- liftIO $ computeMaybeBackrefs path (asString page) maybeShowRefs
   let fileName = fileNameFor path (asString page)
   exists <- liftIO $ doesFileExist fileName
   if exists
     then do
       content <- liftIO $ TIO.readFile fileName
-      return $ buildViewFor (asText page) (wikiWordToMdLink content)
+      return $ buildViewFor (asText page) (wikiWordToMdLink content) maybeBackrefs
     else do
       redirect $ EditR page
 
 getEditR :: PageName -> Handler Html
 getEditR page = do
   path <- getDocumentRoot
-  let pageStr  = asString page
-      pageT    = asText page
+  let pageStr = asString page
+      pageT = asText page
       fileName = fileNameFor path pageStr
   exists <- liftIO $ doesFileExist fileName
   md <-
@@ -104,7 +104,7 @@ getEditR page = do
 postEditR :: PageName -> Handler Html
 postEditR page = do
   path <- getDocumentRoot
-  let pageStr  = asString page
+  let pageStr = asString page
   let fileName = fileNameFor path pageStr
   maybeContent <- lookupPostParam "content"
   client <- remoteHost <$> waiRequest
@@ -112,28 +112,31 @@ postEditR page = do
     Just content -> liftIO $ do
       TIO.writeFile fileName content
       writeLogEntry path pageStr client
-    Nothing      -> redirect $ PageR page
+    Nothing -> redirect $ PageR page
   redirect $ PageR page
 
 writeLogEntry :: FilePath -> FilePath -> SockAddr -> IO ()
 writeLogEntry path page client = do
   let logFile = fileNameFor path "RecentChanges"
   now <- getCurrentTime
-  let logEntry = "- " ++ page ++ " " ++
-        takeWhile (/= '.') (show now) ++ " from " ++
-        takeWhile (/= ':') (show client) ++ "\n"
+  let logEntry =
+        "- " ++ page ++ " "
+          ++ takeWhile (/= '.') (show now)
+          ++ " from "
+          ++ takeWhile (/= ':') (show client)
+          ++ "\n"
   TIO.appendFile logFile $ T.pack logEntry
 
 -- helper functions
 getDocumentRoot :: Handler String
 getDocumentRoot = getsYesod contentDir
 
-fileNameFor :: FilePath -> FilePath  -> String
+fileNameFor :: FilePath -> FilePath -> String
 fileNameFor path page =
   path ++ "/" ++ page
-       ++ if ".md~" `isSuffixOf` page
-         then ""
-         else ".md"
+    ++ if ".md~" `isSuffixOf` page
+      then ""
+      else ".md"
 
 computeIndex :: FilePath -> IO [String]
 computeIndex path = do
@@ -148,14 +151,17 @@ computeBackRefs path page allPages = do
   let pageBoolPairs = zip filteredPages markRefs
   return $ map fst (filter snd pageBoolPairs)
   where
-    containsBackref content = 
-      let 
-        pageT   = T.pack page
-        pageRef = if isWikiWord pageT
-                      then pageT
-                      else T.concat ["](", pageT, ")"]
-      in pageRef `T.isInfixOf` content
+    containsBackref content = T.pack page `T.isInfixOf` content
 
+computeMaybeBackrefs :: FilePath -> FilePath -> Maybe Text -> IO (Maybe [String])
+computeMaybeBackrefs path page maybeShowRefs =
+  case maybeShowRefs of
+    Nothing -> return Nothing
+    Just _ -> do
+      allFiles <- listDirectory path
+      allPages <- computeIndex path
+      backrefs <- computeBackRefs path page allPages
+      return $ Just backrefs
 
 -- computeForwardRefs :: FilePath -> FilePath -> IO [String]
 -- computeForwardRefs path page = do
@@ -170,6 +176,3 @@ removeAll = flip (foldl (flip remove))
   where
     remove :: Eq a => a -> [a] -> [a]
     remove = filter . (/=)
-
-
-
