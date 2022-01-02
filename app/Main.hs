@@ -68,7 +68,7 @@ main = do
 
 -- Route Handlers
 getHomeR :: Handler Html
-getHomeR = getPageR (Page "Home")
+getHomeR = getPageR (Page "HomePage")
 
 getIndexR :: Handler Html
 getIndexR = do
@@ -134,7 +134,7 @@ writeLogEntry :: FilePath -> FilePath -> SockAddr -> IO ()
 writeLogEntry path page client = do
   let logFile = fileNameFor path "RecentChanges"
   now <- getCurrentTime
-  let logEntry = "- [" ++ page ++ "](" ++ page ++ ") " ++
+  let logEntry = "- " ++ page ++ " " ++
         takeWhile (/= '.') (show now) ++ " from " ++
         takeWhile (/= ':') (show client) ++ "\n"
   TIO.appendFile logFile $ T.pack logEntry
@@ -158,14 +158,18 @@ computeIndex path = do
 
 computeBackRefs :: FilePath -> FilePath -> [String] -> IO [String]
 computeBackRefs path page allPages = do
-  markRefs <- mapM (fmap containsBackref . TIO.readFile . fileNameFor path) (filter (page /=) allPages)
-  let pageBoolPairs = zip allPages markRefs
+  let filteredPages = filter (page /=) allPages
+  markRefs <- mapM (fmap containsBackref . TIO.readFile . fileNameFor path) filteredPages
+  let pageBoolPairs = zip filteredPages markRefs
   return $ map fst (filter snd pageBoolPairs)
   where
     containsBackref content = 
-      if isWikiWord (T.pack page)
-        then T.pack page `T.isInfixOf` content
-        else T.concat ["](", T.pack page, ")"] `T.isInfixOf` content
+      let 
+        pageT   = T.pack page
+        pageRef = if isWikiWord pageT
+                      then pageT
+                      else T.concat ["](", pageT, ")"]
+      in pageRef `T.isInfixOf` content
     isWikiWord pageName = 
       case find wikiWordMatch pageName of
         Nothing -> False
@@ -186,12 +190,13 @@ removeAll = flip (foldl (flip remove))
     remove :: Eq a => a -> [a] -> [a]
     remove = filter . (/=)
 
--- | converts WikiWord into a Markdown link: [WikiWord](WikiWord)
+-- | converts a WikiWord into a Markdown link: [WikiWord](WikiWord)
 wikiWordToMdLink :: Text -> Text
 wikiWordToMdLink text = 
   let match   = wikiWordMatch 
       replace = "[$0]($0)"
   in  replaceAll match replace text
 
+-- | the magic WikiWord Regex
 wikiWordMatch :: Regex
-wikiWordMatch = "(?<![\\(\\[])([A-Z][a-z0-9]+){2,}"
+wikiWordMatch = "(?<![\\(\\[])(([A-Z][a-z0-9]+){2,})(?![\\)\\]])"
