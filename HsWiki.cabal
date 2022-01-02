@@ -38,6 +38,7 @@ executable HsWiki
     , cmdargs
     , directory
     , extra
+    , formatting
     , iproute
     , network
     , text

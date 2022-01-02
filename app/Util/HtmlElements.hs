@@ -4,7 +4,7 @@ module Util.HtmlElements
   ( buildViewFor,
     buildEditorFor,
     buildIndex,
-    buildBackRefs,
+    --buildBackRefs,
     buildGraphView,
     newPage,
   )
@@ -79,6 +79,7 @@ buildIndex index =
       pageFooter
     ]
 
+{-
 buildBackRefs :: FilePath -> [String] -> Html
 buildBackRefs page backrefs =
   toHtml
@@ -88,6 +89,7 @@ buildBackRefs page backrefs =
       renderMdToHtml $ T.pack $ concatMap (\b -> "- [" ++ b ++ "](/" ++ b ++ ") \n") backrefs,
       pageFooter
     ]
+-}
 
 buildGraphView :: [([String], String)] -> Html
 buildGraphView graph =

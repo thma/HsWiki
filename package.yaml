@@ -29,7 +29,7 @@ dependencies:
 - iproute
 - text-icu
 - text-regex-replace
-
+- formatting
 
 executables:
   HsWiki:

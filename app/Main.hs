@@ -7,9 +7,9 @@
 module Main where
 
 import           Data.List              (isSuffixOf, sort)
-import           Data.List.Extra        (dropSuffix, isInfixOf)
+import           Data.List.Extra        (dropSuffix)
 import           Data.Text              (Text)
-import qualified Data.Text              as T (concat, isInfixOf, pack, unpack)
+import qualified Data.Text              as T (isInfixOf, pack)
 import           Data.Text.IO           as TIO (appendFile, putStrLn, readFile,
                                                 writeFile)
 import           Data.Time.Clock        (getCurrentTime)
@@ -20,7 +20,7 @@ import           PageName               (PageName (..), asString, asText,
 import           System.Console.CmdArgs ()
 import           System.Directory       (doesFileExist, listDirectory)
 import           Util.Config            (dir, getCommandLineArgs, port)
-import           Util.HtmlElements      (buildBackRefs, buildEditorFor,
+import           Util.HtmlElements      (buildEditorFor,
                                          buildGraphView, buildIndex,
                                          buildViewFor, newPage)
 import           Yesod                  (Html, MonadIO (liftIO),
@@ -28,6 +28,8 @@ import           Yesod                  (Html, MonadIO (liftIO),
                                          getsYesod, lookupGetParam,
                                          lookupPostParam, mkYesod, parseRoutes,
                                          redirect, waiRequest, warp)
+import           Formatting
+import Data.Text.Lazy (toStrict)
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -39,6 +41,7 @@ mkYesod "HsWiki" [parseRoutes|
 /edit/#PageName EditR     GET POST
 /actions/graph  GraphR    GET
 /actions/toc    IndexR    GET
+/actions/find/#Text FindR GET
 |]
 
 instance Yesod HsWiki
@@ -58,14 +61,6 @@ getIndexR = do
   path <- getDocumentRoot
   index <- liftIO $ computeIndex path
   return $ buildIndex index
-
-getBackRefR :: PageName -> Handler Html
-getBackRefR page = do
-  let pageName = asString page
-  path <- getDocumentRoot
-  allPages <- liftIO $ computeIndex path
-  backRefs <- liftIO $ computeBackRefs path pageName allPages
-  return $ buildBackRefs pageName backRefs
 
 getGraphR :: Handler Html
 getGraphR = do
@@ -114,18 +109,26 @@ postEditR page = do
       writeLogEntry path pageStr client
     Nothing -> redirect $ PageR page
   redirect $ PageR page
+  
+getFindR :: Text -> Handler Html
+getFindR search = do
+  path <- getDocumentRoot
+  allPages <- liftIO $ computeIndex path
+  
+  undefined
 
 writeLogEntry :: FilePath -> FilePath -> SockAddr -> IO ()
 writeLogEntry path page client = do
   let logFile = fileNameFor path "RecentChanges"
   now <- getCurrentTime
-  let logEntry =
-        "- " ++ page ++ " "
-          ++ takeWhile (/= '.') (show now)
-          ++ " from "
-          ++ takeWhile (/= ':') (show client)
-          ++ "\n"
-  TIO.appendFile logFile $ T.pack logEntry
+  
+  let logEntry = toStrict $ 
+        format ("- " % string % " " % string % " from " % string % "\n")
+          page
+          (takeWhile (/= '.') (show now))
+          (takeWhile (/= ':') (show client))
+  
+  TIO.appendFile logFile logEntry
 
 -- helper functions
 getDocumentRoot :: Handler String
@@ -158,7 +161,6 @@ computeMaybeBackrefs path page maybeShowRefs =
   case maybeShowRefs of
     Nothing -> return Nothing
     Just _ -> do
-      allFiles <- listDirectory path
       allPages <- computeIndex path
       backrefs <- computeBackRefs path page allPages
       return $ Just backrefs
