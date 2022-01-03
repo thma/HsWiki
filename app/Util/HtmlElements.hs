@@ -4,7 +4,6 @@ module Util.HtmlElements
   ( buildViewFor,
     buildEditorFor,
     buildIndex,
-    --buildBackRefs,
     buildGraphView,
     buildFindPage,
     newPage,
@@ -20,19 +19,23 @@ import           Text.Blaze.Html (Html, preEscapedToHtml, text, toHtml)
 menuBar :: Text -> Html
 menuBar page = renderMdToHtml $ mdMenu page
 
-pageHeader :: Html
-pageHeader =
-  preEscapedToHtml $
-    "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n"
-      ++ "<title>HsWiki</title>\r\n"
-      ++ "<meta charset=\"UTF-8\">\r\n"
-      ++ "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\"> \n"
-      ++ "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css\"> \n"
-      ++ "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.css\"> \n"
-      ++ "</head>\r\n<body onload=\"init()\">\r\n<div class=\"container\">\r\n"
+pageHeader :: Bool -> Html
+pageHeader renderInit =
+  preEscapedToHtml (
+    let initBlock = if renderInit then "onload=\"init()\"" else ""
+    in 
+      "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n"
+        <> "<title>HsWiki</title>\r\n"
+        <> "<meta charset=\"UTF-8\">\r\n"
+        <> "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\"> \n"
+        <> "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css\"> \n"
+        <> "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.css\"> \n"
+        <> "</head>\r\n<body"
+        <> initBlock
+        <> ">\r\n<div class=\"container\">\r\n" :: Text)
 
 pageFooter :: Html
-pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: String)
+pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: Text)
 
 buildViewFor :: Text -> Text -> Maybe [String] -> Html
 buildViewFor page content maybeBackrefs =
@@ -43,20 +46,21 @@ buildViewFor page content maybeBackrefs =
         Nothing -> text ""
         Just backrefs -> renderedBackrefs
           where
-            renderedBackrefs = renderMdToHtml $ T.pack $ concatMap (\b -> "- [" ++ b ++ "](/" ++ b ++ ") \n") backrefs
-   in toHtml [pageHeader, menuBar page, pageTitle (T.unpack page) hasBackref, backrefEntry, renderMdToHtml content, pageFooter]
+            renderedBackrefs = renderMdToHtml $ T.pack $ concatMap (\b -> "- [" <> b <> "](/" <> b <> ") \n") backrefs
+   in toHtml [pageHeader False, menuBar page, pageTitle (T.unpack page) hasBackref, backrefEntry, renderMdToHtml content, pageFooter]
 
 pageTitle :: String -> Bool -> Html
 pageTitle pageName hasBackref =
   if hasBackref
-    then renderMdToHtml $ T.pack $ "# [" ++ pageName ++ "](" ++ pageName ++ ")"
-    else renderMdToHtml $ T.pack $ "# [" ++ pageName ++ "](" ++ pageName ++ "?showBackrefs)"
+    then renderMdToHtml $ T.pack $ "# [" <> pageName <> "](" <> pageName <> ")"
+    else renderMdToHtml $ T.pack $ "# [" <> pageName <> "](" <> pageName <> "?showBackrefs)"
 
 buildEditorFor :: Text -> Text -> Html
 buildEditorFor page markdown =
   toHtml
-    [ pageHeader,
+    [ pageHeader False,
       menuBar page,
+      renderMdToHtml $ "# " <> page <> " \n",
       preEscapedToHtml $
         "<form action=\""
           ++ T.unpack page
@@ -73,7 +77,7 @@ buildEditorFor page markdown =
 buildIndex :: [String] -> Html
 buildIndex index =
   toHtml
-    [ pageHeader,
+    [ pageHeader False,
       menuBar "",
       renderMdToHtml "# Table of contents \n",
       renderMdToHtml $ T.pack $ concatMap (\page -> "- [" ++ page ++ "](/" ++ page ++ ") \n") index,
@@ -82,7 +86,7 @@ buildIndex index =
 
 buildFindPage :: Text -> [String] -> Html
 buildFindPage search pages = toHtml 
-  [ pageHeader,
+  [ pageHeader True,
     menuBar "",
     renderMdToHtml $ T.pack "# FindPage ",
     searchBox search,
@@ -111,7 +115,7 @@ searchBox search =
 buildGraphView :: [([String], String)] -> Html
 buildGraphView graph =
   toHtml
-    [ pageHeader,
+    [ pageHeader False,
       menuBar "",
       renderMdToHtml "# Site Map \n",
       renderMdToHtml "[View as List](/actions/toc) \n",
@@ -168,14 +172,10 @@ bottom =
 renderMdToHtml :: Text -> Html
 renderMdToHtml = preEscapedToHtml . commonmarkToHtml [] []
 
-newPage :: Text -> Text
-newPage page =
-  T.pack $
-    "# " ++ T.unpack page ++ "\n\n"
-      ++ "### [Be the first to edit this page](/edit/"
-      ++ T.unpack page
-      ++ ") \n\n"
-      ++ "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
+newPage :: Text
+newPage =
+     "Use WikiWords in PascalCase for Links. \n\n"
+  <> "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
 
 mdMenu :: Text -> Text
 mdMenu page =

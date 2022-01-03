@@ -29,7 +29,7 @@ import           Yesod                  (Html, MonadIO (liftIO),
                                          lookupPostParam, mkYesod, parseRoutes,
                                          redirect, waiRequest, warp)
 import           Formatting
-import Data.Text.Lazy (toStrict)
+import           Data.Text.Lazy         (toStrict)
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -93,7 +93,7 @@ getEditR page = do
   md <-
     if exists
       then liftIO $ TIO.readFile fileName
-      else return $ newPage pageT
+      else return newPage
   return $ buildEditorFor pageT md
 
 postEditR :: PageName -> Handler Html
@@ -170,14 +170,6 @@ computeMaybeBackrefs path page maybeShowRefs =
       allPages <- computeIndex path
       backrefs <- computeBackRefs path page allPages
       return $ Just backrefs
-
--- computeForwardRefs :: FilePath -> FilePath -> IO [String]
--- computeForwardRefs path page = do
---   content <- TIO.readFile (fileNameFor path page)
---   let text = content
---   let node = commonmarkToNode [] [] text
---   print node
---   return undefined
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
 removeAll = flip (foldl (flip remove))
