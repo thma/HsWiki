@@ -29,7 +29,7 @@ pageHeader =
       ++ "<link rel=\"stylesheet\" href=\"https://fonts.googleapis.com/css?family=Roboto:300,300italic,700,700italic\"> \n"
       ++ "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/normalize/8.0.1/normalize.css\"> \n"
       ++ "<link rel=\"stylesheet\" href=\"https://cdnjs.cloudflare.com/ajax/libs/milligram/1.4.1/milligram.css\"> \n"
-      ++ "</head>\r\n<body>\r\n<div class=\"container\">\r\n"
+      ++ "</head>\r\n<body onload=\"init()\">\r\n<div class=\"container\">\r\n"
 
 pageFooter :: Html
 pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: String)
@@ -93,24 +93,20 @@ buildFindPage search pages = toHtml
 searchBox :: Text -> Html
 searchBox search =
   preEscapedToHtml $
+    "<script type=\"text/javascript\">"
+    ++ "function init()"
+    ++ "{"
+    ++ "     document.getElementById(\"search\").focus();"
+    ++ "}"     
+    ++ "</script>"
+    ++
     "<form action=\"/actions/find\""
       ++ " method=\"GET\">"
-      ++ "<input type=\"text\" id=\"search\" name=\"search\" value=\"" ++ T.unpack search ++ "\" /> "
+      ++ "<input type=\"text\" id=\"search\" name=\"search\" value=\"" ++ T.unpack search ++ "\" " 
+      ++ "onfocus=\"this.setSelectionRange(9999, 9999)\" " 
+      ++ "onkeyup=\"this.form.submit()\" /> "
       ++ "<input type=\"submit\" value=\"find\" />"
       ++ "</form>"
-
-
-{-
-buildBackRefs :: FilePath -> [String] -> Html
-buildBackRefs page backrefs =
-  toHtml
-    [ pageHeader,
-      menuBar "",
-      renderMdToHtml $ T.pack $ "# References to " ++ page ++ "\n",
-      renderMdToHtml $ T.pack $ concatMap (\b -> "- [" ++ b ++ "](/" ++ b ++ ") \n") backrefs,
-      pageFooter
-    ]
--}
 
 buildGraphView :: [([String], String)] -> Html
 buildGraphView graph =

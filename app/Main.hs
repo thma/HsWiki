@@ -27,7 +27,7 @@ import           Yesod                  (Html, MonadIO (liftIO),
                                          RenderRoute (renderRoute), Yesod,
                                          getsYesod, lookupGetParam,
                                          lookupPostParam, mkYesod, parseRoutes,
-                                         redirect, waiRequest, warp, toHtml)
+                                         redirect, waiRequest, warp)
 import           Formatting
 import Data.Text.Lazy (toStrict)
 
