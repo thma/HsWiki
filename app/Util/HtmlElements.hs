@@ -6,6 +6,7 @@ module Util.HtmlElements
     buildIndex,
     --buildBackRefs,
     buildGraphView,
+    buildFindPage,
     newPage,
   )
 where
@@ -78,6 +79,26 @@ buildIndex index =
       renderMdToHtml $ T.pack $ concatMap (\page -> "- [" ++ page ++ "](/" ++ page ++ ") \n") index,
       pageFooter
     ]
+
+buildFindPage :: Text -> [String] -> Html
+buildFindPage search pages = toHtml 
+  [ pageHeader,
+    menuBar "",
+    renderMdToHtml $ T.pack "# FindPage ",
+    searchBox search,
+    renderMdToHtml $ T.pack $ concatMap (\p -> "- [" ++ p ++ "](/" ++ p ++ ") \n") pages,
+    pageFooter
+  ]
+  
+searchBox :: Text -> Html
+searchBox search =
+  preEscapedToHtml $
+    "<form action=\"/actions/find\""
+      ++ " method=\"GET\">"
+      ++ "<input type=\"text\" id=\"search\" name=\"search\" value=\"" ++ T.unpack search ++ "\" /> "
+      ++ "<input type=\"submit\" value=\"find\" />"
+      ++ "</form>"
+
 
 {-
 buildBackRefs :: FilePath -> [String] -> Html
@@ -163,7 +184,7 @@ newPage page =
 mdMenu :: Text -> Text
 mdMenu page =
   T.pack $
-    "[home](/) | [site map](/actions/graph) |  [recent changes](/RecentChanges) | "
+    "[home](/) | [site map](/actions/graph) |  [recent changes](/RecentChanges) | [find](/actions/find) | "
       ++ ( if page == ""
              then "edit"
              else "[edit](/edit/" ++ T.unpack page ++ ")"

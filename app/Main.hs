@@ -9,7 +9,7 @@ module Main where
 import           Data.List              (isSuffixOf, sort)
 import           Data.List.Extra        (dropSuffix)
 import           Data.Text              (Text)
-import qualified Data.Text              as T (isInfixOf, pack)
+import qualified Data.Text              as T (isInfixOf, pack, toLower, toLower)
 import           Data.Text.IO           as TIO (appendFile, putStrLn, readFile,
                                                 writeFile)
 import           Data.Time.Clock        (getCurrentTime)
@@ -20,14 +20,14 @@ import           PageName               (PageName (..), asString, asText,
 import           System.Console.CmdArgs ()
 import           System.Directory       (doesFileExist, listDirectory)
 import           Util.Config            (dir, getCommandLineArgs, port)
-import           Util.HtmlElements      (buildEditorFor,
+import           Util.HtmlElements      (buildEditorFor, buildFindPage,
                                          buildGraphView, buildIndex,
                                          buildViewFor, newPage)
 import           Yesod                  (Html, MonadIO (liftIO),
                                          RenderRoute (renderRoute), Yesod,
                                          getsYesod, lookupGetParam,
                                          lookupPostParam, mkYesod, parseRoutes,
-                                         redirect, waiRequest, warp)
+                                         redirect, waiRequest, warp, toHtml)
 import           Formatting
 import Data.Text.Lazy (toStrict)
 
@@ -41,7 +41,7 @@ mkYesod "HsWiki" [parseRoutes|
 /edit/#PageName EditR     GET POST
 /actions/graph  GraphR    GET
 /actions/toc    IndexR    GET
-/actions/find/#Text FindR GET
+/actions/find/  FindR     GET
 |]
 
 instance Yesod HsWiki
@@ -58,15 +58,15 @@ getHomeR = getPageR (Page "HomePage")
 
 getIndexR :: Handler Html
 getIndexR = do
-  path <- getDocumentRoot
+  path  <- getDocumentRoot
   index <- liftIO $ computeIndex path
   return $ buildIndex index
 
 getGraphR :: Handler Html
 getGraphR = do
-  path <- getDocumentRoot
+  path     <- getDocumentRoot
   allPages <- liftIO $ computeIndex path
-  allRefs <- liftIO $ mapM (\p -> computeBackRefs path p allPages) allPages
+  allRefs  <- liftIO $ mapM (\p -> computeBackRefs path p allPages) allPages
   return $ buildGraphView $ zip allRefs allPages
 
 getPageR :: PageName -> Handler Html
@@ -110,24 +110,30 @@ postEditR page = do
     Nothing -> redirect $ PageR page
   redirect $ PageR page
   
-getFindR :: Text -> Handler Html
-getFindR search = do
+getFindR :: Handler Html
+getFindR = do
   path <- getDocumentRoot
   allPages <- liftIO $ computeIndex path
-  
-  undefined
+  maybeSearch <- lookupGetParam "search"
+  case maybeSearch of
+    Nothing     -> return $ buildFindPage "" []
+    Just ""     -> return $ buildFindPage "" []
+    Just search -> do
+      let containsSearchText content = T.toLower search `T.isInfixOf` T.toLower content
+      markMatches <- liftIO $ mapM (\p -> fmap containsSearchText $ return (T.pack p) <> TIO.readFile (fileNameFor path p)) allPages
+      let pageBoolPairs = zip allPages markMatches
+      let matchingPages = map fst (filter snd pageBoolPairs)
+      return $ buildFindPage search matchingPages
 
 writeLogEntry :: FilePath -> FilePath -> SockAddr -> IO ()
 writeLogEntry path page client = do
   let logFile = fileNameFor path "RecentChanges"
-  now <- getCurrentTime
-  
+  now <- getCurrentTime  
   let logEntry = toStrict $ 
         format ("- " % string % " " % string % " from " % string % "\n")
           page
           (takeWhile (/= '.') (show now))
-          (takeWhile (/= ':') (show client))
-  
+          (takeWhile (/= ':') (show client))  
   TIO.appendFile logFile logEntry
 
 -- helper functions
