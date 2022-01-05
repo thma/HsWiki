@@ -57,7 +57,7 @@ buildEditorFor :: PageName -> Text -> Html
 buildEditorFor pageName markdown =
   toHtml
     [ pageHeader False,
-      menuBar page,
+      menuBar "",
       renderMdToHtml $ "# " <> page <> " \n",
       preEscapedToHtml $
         "<form action=\""

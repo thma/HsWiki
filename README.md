@@ -65,6 +65,8 @@ renderMdToHtml = preEscapedToHtml . commonmarkToHtml [] []
 
 ## Inplace Content Editing
 
+### Type safe page names
+
 In order to work with the wiki page names in a type safe manner we first introduce a newtype `PageName`.
 In order to make sure that only proper [WikiWords](https://en.wikipedia.org/w/index.php?title=WikiWord) can be used as page names I'm using a smart constructor `pageName` which only constructs a `PageName`instance if the intented page name matches the `wikiWordMatch` regular expression:
 
@@ -88,6 +90,8 @@ isWikiWord pageName =
 wikiWordMatch :: Regex
 wikiWordMatch = "([A-Z][a-z0-9]+){2,}"    
 ```
+
+### The Yesod routes for the editor
 
 The following `PathPiece` instance declaration is required to use the `PageName` as part of a Yesod route definition:
 
@@ -148,6 +152,8 @@ getEditR  :: PageName -> Handler Html
 postEditR :: PageName -> Handler Html
 ```
 
+### serving an editor
+
 Now let's study the implementation of these two function step by step
 
 ```haskell
@@ -182,7 +188,7 @@ buildEditorFor :: PageName -> Text -> Html
 buildEditorFor pageName markdown =
   toHtml
     [ pageHeader False,
-      menuBar page,
+      menuBar "",
       renderMdToHtml $ "# " <> page <> " \n",
       preEscapedToHtml $
         "<form action=\"" <> page <> "\" method=\"POST\">"
