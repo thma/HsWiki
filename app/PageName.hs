@@ -1,9 +1,10 @@
 {-# LANGUAGE OverloadedStrings #-}
 
 module PageName
-  ( PageName (..),
+  ( PageName,
     asString,
     asText,
+    pageName,
     isWikiWord,
     wikiWordToMdLink,
   )
@@ -11,25 +12,32 @@ where
 
 import           Data.Text             (Text)
 import qualified Data.Text             as T (pack, unpack)
-import           Data.Text.ICU         (Regex, find)
-import           Data.Text.ICU.Replace
+import           Data.Text.ICU         (Regex, find, fromText)
+import           Data.Text.ICU.Replace ( replaceAll )
 import           Yesod                 (PathPiece (fromPathPiece, toPathPiece))
 
-newtype PageName = Page String deriving (Eq, Read, Show)
+newtype PageName = Page Text deriving (Eq, Read, Show)
 
 instance PathPiece PageName where
-  toPathPiece page = asText page
-  fromPathPiece text = Just $ Page (T.unpack text)
+  toPathPiece page   = asText page
+  fromPathPiece text = pageName text
 
 asText :: PageName -> Text
-asText (Page name) = T.pack name
+asText (Page name) = name
 
 asString :: PageName -> String
-asString (Page name) = name
+asString (Page name) = T.unpack name
+
+pageName :: Text -> Maybe PageName
+pageName name =
+  if isWikiWord name
+    then Just $ Page name
+    else Nothing
 
 -- | the magic WikiWord Regex
 wikiWordMatch :: Regex
-wikiWordMatch = "(?<![\\(\\[])(([A-Z][a-z0-9]+){2,})(?![\\)\\]])"
+wikiWordMatch = "([A-Z][a-z0-9]+){2,}"
+--wikiWordMatch = "(?<![\\(\\[])(([A-Z][a-z0-9]+){2,})(?![\\)\\]])"
 
 -- | checks if a given Text is a WikiWord
 isWikiWord :: Text -> Bool

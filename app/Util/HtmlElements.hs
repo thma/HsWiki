@@ -39,12 +39,9 @@ pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: Text)
 
 buildViewFor :: Text -> Text -> Maybe [String] -> Html
 buildViewFor page content maybeBackrefs =
-  let hasBackref = case maybeBackrefs of
-        Nothing -> False
-        Just _  -> True
-      backrefEntry = case maybeBackrefs of
-        Nothing -> text ""
-        Just backrefs -> renderedBackrefs
+  let (hasBackref, backrefEntry) = case maybeBackrefs of
+        Nothing       -> (False, text "")
+        Just backrefs -> (True, renderedBackrefs)
           where
             renderedBackrefs = renderMdToHtml $ T.pack $ concatMap (\b -> "- [" <> b <> "](/" <> b <> ") \n") backrefs
    in toHtml [pageHeader False, menuBar page, pageTitle (T.unpack page) hasBackref, backrefEntry, renderMdToHtml content, pageFooter]

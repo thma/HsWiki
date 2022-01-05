@@ -15,8 +15,8 @@ import           Data.Text.IO           as TIO (appendFile, putStrLn, readFile,
 import           Data.Time.Clock        (getCurrentTime)
 import           Network.Socket         (SockAddr (..))
 import           Network.Wai            (Request (remoteHost))
-import           PageName               (PageName (..), asString, asText,
-                                         wikiWordToMdLink)
+import           PageName               (PageName, asString, asText,
+                                         pageName, wikiWordToMdLink)
 import           System.Console.CmdArgs ()
 import           System.Directory       (doesFileExist, listDirectory)
 import           Util.Config            (dir, getCommandLineArgs, port)
@@ -37,8 +37,8 @@ newtype HsWiki = HsWiki
 
 mkYesod "HsWiki" [parseRoutes|
 /               HomeR     GET
-/#PageName      PageR     GET
-/edit/#PageName EditR     GET POST
+/#PageName      PageR     GET        -- (1)
+/edit/#PageName EditR     GET POST   -- (2)
 /actions/graph  GraphR    GET
 /actions/toc    IndexR    GET
 /actions/find/  FindR     GET
@@ -54,7 +54,11 @@ main = do
 
 -- Route Handlers
 getHomeR :: Handler Html
-getHomeR = getPageR (Page "HomePage")
+getHomeR = 
+  case pageName "HomePage" of
+    Just page -> getPageR page
+    Nothing   -> error "will not happen as HomePage is a WikiWord"
+
 
 getIndexR :: Handler Html
 getIndexR = do
@@ -86,15 +90,13 @@ getPageR page = do
 getEditR :: PageName -> Handler Html
 getEditR page = do
   path <- getDocumentRoot
-  let pageStr = asString page
-      pageT = asText page
-      fileName = fileNameFor path pageStr
+  let fileName = fileNameFor path (asString page)
   exists <- liftIO $ doesFileExist fileName
   md <-
     if exists
       then liftIO $ TIO.readFile fileName
       else return newPage
-  return $ buildEditorFor pageT md
+  return $ buildEditorFor (asText page) md
 
 postEditR :: PageName -> Handler Html
 postEditR page = do
