@@ -15,7 +15,7 @@ import           Data.List       (nub)
 import           Data.Text       (Text)
 import qualified Data.Text       as T (pack, unpack)
 import           Text.Blaze.Html (Html, preEscapedToHtml, text, toHtml)
-import PageName (PageName, asString)
+import PageName (PageName, asString, asText)
 
 menuBar :: Text -> Html
 menuBar page = renderMdToHtml $ mdMenu page
@@ -24,7 +24,7 @@ pageHeader :: Bool -> Html
 pageHeader renderInit =
   preEscapedToHtml (
     let initBlock = if renderInit then "onload=\"init()\"" else ""
-    in 
+    in
       "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n"
         <> "<title>HsWiki</title>\r\n"
         <> "<meta charset=\"UTF-8\">\r\n"
@@ -38,13 +38,13 @@ pageHeader renderInit =
 pageFooter :: Html
 pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: Text)
 
-buildViewFor :: Text -> Text -> Maybe [String] -> Html
+buildViewFor :: Text -> Text -> Maybe [PageName] -> Html
 buildViewFor page content maybeBackrefs =
   let (hasBackref, backrefEntry) = case maybeBackrefs of
         Nothing       -> (False, text "")
         Just backrefs -> (True, renderedBackrefs)
           where
-            renderedBackrefs = renderMdToHtml $ T.pack $ concatMap (\b -> "- [" <> b <> "](/" <> b <> ") \n") backrefs
+            renderedBackrefs = renderMdToHtml $ T.pack $ concatMap ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asString) backrefs
    in toHtml [pageHeader False, menuBar page, pageTitle (T.unpack page) hasBackref, backrefEntry, renderMdToHtml content, pageFooter]
 
 pageTitle :: String -> Bool -> Html
@@ -53,8 +53,8 @@ pageTitle pageName hasBackref =
     then renderMdToHtml $ T.pack $ "# [" <> pageName <> "](" <> pageName <> ")"
     else renderMdToHtml $ T.pack $ "# [" <> pageName <> "](" <> pageName <> "?showBackrefs)"
 
-buildEditorFor :: Text -> Text -> Html
-buildEditorFor page markdown =
+buildEditorFor :: PageName -> Text -> Html
+buildEditorFor pageName markdown =
   toHtml
     [ pageHeader False,
       menuBar page,
@@ -71,6 +71,7 @@ buildEditorFor page markdown =
           ++ "</form>",
       pageFooter
     ]
+  where page = asText pageName
 
 buildIndex :: [PageName] -> Html
 buildIndex index =
@@ -82,16 +83,16 @@ buildIndex index =
       pageFooter
     ]
 
-buildFindPage :: Text -> [String] -> Html
-buildFindPage search pages = toHtml 
+buildFindPage :: Text -> [PageName] -> Html
+buildFindPage search pages = toHtml
   [ pageHeader True,
     menuBar "",
     renderMdToHtml $ T.pack "# FindPage ",
     searchBox search,
-    renderMdToHtml $ T.pack $ concatMap (\p -> "- [" ++ p ++ "](/" ++ p ++ ") \n") pages,
+    renderMdToHtml $ T.pack $ concatMap (\p -> "- [" ++ asString p ++ "](/" ++ asString p ++ ") \n") pages,
     pageFooter
   ]
-  
+
 searchBox :: Text -> Html
 searchBox search =
   preEscapedToHtml $
@@ -99,13 +100,13 @@ searchBox search =
     ++ "function init()"
     ++ "{"
     ++ "     document.getElementById(\"search\").focus();"
-    ++ "}"     
+    ++ "}"
     ++ "</script>"
     ++
     "<form action=\"/actions/find\""
       ++ " method=\"GET\">"
-      ++ "<input type=\"text\" id=\"search\" name=\"search\" value=\"" ++ T.unpack search ++ "\" " 
-      ++ "onfocus=\"this.setSelectionRange(9999, 9999)\" " 
+      ++ "<input type=\"text\" id=\"search\" name=\"search\" value=\"" ++ T.unpack search ++ "\" "
+      ++ "onfocus=\"this.setSelectionRange(9999, 9999)\" "
       ++ "onkeyup=\"this.form.submit()\" /> "
       ++ "<input type=\"submit\" value=\"find\" />"
       ++ "</form>"
@@ -124,23 +125,23 @@ buildGraphView graph =
       pageFooter
     ]
 
-renderGraph :: [([String], String)] -> String
+renderGraph :: [([PageName], PageName)] -> String
 renderGraph graph =
   foldr
     (\str -> ((str ++ ",\n") ++))
     ""
-    (concatMap (\(sources, target) -> map (\s -> "'\"" ++ s ++ "\" -> \"" ++ target ++ "\";'") sources) graph)
+    (concatMap (\(sources, target) -> map (\s -> "'\"" ++ asString s ++ "\" -> \"" ++ asString target ++ "\";'") sources) graph)
 
-allNodes :: [([String], String)] -> [String]
+allNodes :: [([PageName], PageName)] -> [PageName]
 allNodes = nub . (uncurry (flip (:)) =<<)
 
-renderNodes :: [String] -> String
+renderNodes :: [PageName ] -> String
 renderNodes =
   concatMap
     ( \n ->
-        "'\"" ++ n
+        "'\"" ++ asString n
           ++ "\" [shape=\"rect\", style=\"rounded,filled\", fillcolor=\"#f4f5f6\", fontcolor=\"#9b4dca\", fontname=\"Roboto\",  URL=\"/"
-          ++ n
+          ++ asString n
           ++ "\"];', \n"
     )
 

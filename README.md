@@ -153,15 +153,15 @@ Now let's study the implementation of these two function step by step
 ```haskell
 -- | handler for GET /edit/#PageName
 getEditR :: PageName -> Handler Html
-getEditR page = do
-  path <- getDocumentRoot                          -- obtain path to document root 
-  let fileName = fileNameFor path (asString page)  -- construct a file from the page name
-  exists <- liftIO $ doesFileExist fileName
-  md <-
+getEditR pageName = do
+  path <- getDocumentRoot                    -- obtain path to document root 
+  let fileName = fileNameFor path pageName   -- construct a file from the page name
+  exists <- liftIO $ doesFileExist fileName  -- check whether file already exists
+  markdown <-
     if exists
-      then liftIO $ TIO.readFile fileName
-      else return newPage
-  return $ buildEditorFor (asText page) md
+      then liftIO $ TIO.readFile fileName    -- if file exists, assign markdown with file content
+      else return newPage                    -- else assign markdown with some default content
+  return $ buildEditorFor pageName markdown  -- build Html for an Editor page, fill it with markdown content
 
 -- | retrieve the name of the HsWiki {contentDir} attribute
 getDocumentRoot :: Handler String

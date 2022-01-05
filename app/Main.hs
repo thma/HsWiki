@@ -16,7 +16,8 @@ import           Data.Time.Clock        (getCurrentTime)
 import           Network.Socket         (SockAddr (..))
 import           Network.Wai            (Request (remoteHost))
 import           PageName               (PageName, asString, asText,
-                                         pageName, wikiWordToMdLink)
+                                         pageName, wikiWordToMdLink,
+                                         homePage, recentChanges)
 import           System.Console.CmdArgs ()
 import           System.Directory       (doesFileExist, listDirectory)
 import           Util.Config            (dir, getCommandLineArgs, port)
@@ -28,9 +29,9 @@ import           Yesod                  (Html, MonadIO (liftIO),
                                          getsYesod, lookupGetParam,
                                          lookupPostParam, mkYesod, parseRoutes,
                                          redirect, waiRequest, warp)
-import           Formatting
+import           Formatting             (string, (%), format )
 import           Data.Text.Lazy         (toStrict)
-import Data.Maybe (isNothing, isJust, fromMaybe)
+import           Data.Maybe             (isJust, fromMaybe)
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -55,11 +56,7 @@ main = do
 
 -- Route Handlers
 getHomeR :: Handler Html
-getHomeR =
-  case pageName "HomePage" of
-    Just page -> getPageR page
-    Nothing   -> error "will not happen as HomePage is a WikiWord"
-
+getHomeR = getPageR homePage 
 
 getIndexR :: Handler Html
 getIndexR = do
@@ -91,14 +88,14 @@ getPageR pageName = do
 -- | handler for GET /edit/#PageName
 getEditR :: PageName -> Handler Html
 getEditR pageName = do
-  path <- getDocumentRoot                          -- obtain path to document root 
-  let fileName = fileNameFor path pageName  -- construct a file from the page name
-  exists <- liftIO $ doesFileExist fileName
-  md <-
+  path <- getDocumentRoot                    -- obtain path to document root 
+  let fileName = fileNameFor path pageName   -- construct a file from the page name
+  exists <- liftIO $ doesFileExist fileName  -- check whether file already exists
+  markdown <-
     if exists
-      then liftIO $ TIO.readFile fileName
-      else return newPage
-  return $ buildEditorFor (asText pageName) md
+      then liftIO $ TIO.readFile fileName    -- if file exists, assign markdown with file content
+      else return newPage                    -- else assign markdown with some default content
+  return $ buildEditorFor pageName markdown  -- build Html for an Editor page, fill it with markdown content
 
 postEditR :: PageName -> Handler Html
 postEditR pageName = do
@@ -123,14 +120,14 @@ getFindR = do
     Just ""     -> return $ buildFindPage "" []
     Just search -> do
       let containsSearchText content = T.toLower search `T.isInfixOf` T.toLower content
-      markMatches <- liftIO $ mapM (\p -> fmap containsSearchText $ return (T.pack p) <> TIO.readFile (fileNameFor path p)) allPages
+      markMatches <- liftIO $ mapM (\p -> fmap containsSearchText $ return (asText p) <> TIO.readFile (fileNameFor path p)) allPages
       let pageBoolPairs = zip allPages markMatches
       let matchingPages = map fst (filter snd pageBoolPairs)
       return $ buildFindPage search matchingPages
 
 writeLogEntry :: FilePath -> PageName -> SockAddr -> IO ()
 writeLogEntry path pageName client = do
-  let logFile = fileNameFor path "RecentChanges"
+  let logFile = fileNameFor path recentChanges 
   now <- getCurrentTime
   let logEntry = toStrict $
         format ("- " % string % " " % string % " from " % string % "\n")

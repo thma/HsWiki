@@ -7,6 +7,8 @@ module PageName
     pageName,
     isWikiWord,
     wikiWordToMdLink,
+    homePage,
+    recentChanges
   )
 where
 
@@ -52,3 +54,10 @@ wikiWordToMdLink text =
   let match = wikiWordMatch
       replace = "[$0]($0)"
    in replaceAll match replace text
+
+-- special page names are constructed here
+homePage :: PageName
+homePage = Page "HomePage"
+
+recentChanges :: PageName
+recentChanges = Page "RecentChanges"
