@@ -30,6 +30,7 @@ import           Yesod                  (Html, MonadIO (liftIO),
                                          redirect, waiRequest, warp)
 import           Formatting
 import           Data.Text.Lazy         (toStrict)
+import Data.Maybe (isNothing, isJust, fromMaybe)
 
 newtype HsWiki = HsWiki
   { contentDir :: String
@@ -54,7 +55,7 @@ main = do
 
 -- Route Handlers
 getHomeR :: Handler Html
-getHomeR = 
+getHomeR =
   case pageName "HomePage" of
     Just page -> getPageR page
     Nothing   -> error "will not happen as HomePage is a WikiWord"
@@ -74,44 +75,44 @@ getGraphR = do
   return $ buildGraphView $ zip allRefs allPages
 
 getPageR :: PageName -> Handler Html
-getPageR page = do
+getPageR pageName = do
   path <- getDocumentRoot
   maybeShowRefs <- lookupGetParam "showBackrefs"
-  maybeBackrefs <- liftIO $ computeMaybeBackrefs path (asString page) maybeShowRefs
-  let fileName = fileNameFor path (asString page)
+  maybeBackrefs <- liftIO $ computeMaybeBackrefs path pageName maybeShowRefs
+  let fileName = fileNameFor path pageName
   exists <- liftIO $ doesFileExist fileName
   if exists
     then do
       content <- liftIO $ TIO.readFile fileName
-      return $ buildViewFor (asText page) (wikiWordToMdLink content) maybeBackrefs
+      return $ buildViewFor (asText pageName) (wikiWordToMdLink content) maybeBackrefs
     else do
-      redirect $ EditR page
+      redirect $ EditR pageName
 
+-- | handler for GET /edit/#PageName
 getEditR :: PageName -> Handler Html
-getEditR page = do
-  path <- getDocumentRoot
-  let fileName = fileNameFor path (asString page)
+getEditR pageName = do
+  path <- getDocumentRoot                          -- obtain path to document root 
+  let fileName = fileNameFor path pageName  -- construct a file from the page name
   exists <- liftIO $ doesFileExist fileName
   md <-
     if exists
       then liftIO $ TIO.readFile fileName
       else return newPage
-  return $ buildEditorFor (asText page) md
+  return $ buildEditorFor (asText pageName) md
 
 postEditR :: PageName -> Handler Html
-postEditR page = do
+postEditR pageName = do
   path <- getDocumentRoot
-  let pageStr = asString page
-  let fileName = fileNameFor path pageStr
+  let fileName = fileNameFor path pageName
   maybeContent <- lookupPostParam "content"
   client <- remoteHost <$> waiRequest
   case maybeContent of
     Just content -> liftIO $ do
       TIO.writeFile fileName content
-      writeLogEntry path pageStr client
-    Nothing -> redirect $ PageR page
-  redirect $ PageR page
-  
+      writeLogEntry path pageName client
+    Nothing -> redirect $ PageR pageName
+  redirect $ PageR pageName
+
 getFindR :: Handler Html
 getFindR = do
   path <- getDocumentRoot
@@ -127,50 +128,51 @@ getFindR = do
       let matchingPages = map fst (filter snd pageBoolPairs)
       return $ buildFindPage search matchingPages
 
-writeLogEntry :: FilePath -> FilePath -> SockAddr -> IO ()
-writeLogEntry path page client = do
+writeLogEntry :: FilePath -> PageName -> SockAddr -> IO ()
+writeLogEntry path pageName client = do
   let logFile = fileNameFor path "RecentChanges"
-  now <- getCurrentTime  
-  let logEntry = toStrict $ 
+  now <- getCurrentTime
+  let logEntry = toStrict $
         format ("- " % string % " " % string % " from " % string % "\n")
-          page
+          (asString pageName)
           (takeWhile (/= '.') (show now))
-          (takeWhile (/= ':') (show client))  
+          (takeWhile (/= ':') (show client))
   TIO.appendFile logFile logEntry
 
 -- helper functions
 getDocumentRoot :: Handler String
 getDocumentRoot = getsYesod contentDir
 
-fileNameFor :: FilePath -> FilePath -> String
-fileNameFor path page =
-  path ++ "/" ++ page
-    ++ if ".md~" `isSuffixOf` page
+fileNameFor :: FilePath -> PageName  -> String
+fileNameFor path pageName =
+  path ++ "/" ++ asString pageName
+    ++ if ".md~" `isSuffixOf` asString pageName
       then ""
       else ".md"
 
-computeIndex :: FilePath -> IO [String]
+computeIndex :: FilePath -> IO [PageName]
 computeIndex path = do
   allFiles <- listDirectory path
-  let pages = removeAll ["touch", "favicon.ico.md", "RecentChanges.md"] allFiles
-  return $ sort $ map (dropSuffix ".md") pages
+  let pages = sort $ map (dropSuffix ".md") $ removeAll ["touch", "favicon.ico.md", "RecentChanges.md"] allFiles
+  return $ map (fromMaybe  undefined) $ filter isJust $ map (pageName . T.pack) pages
 
-computeBackRefs :: FilePath -> FilePath -> [String] -> IO [String]
+
+computeBackRefs :: FilePath -> PageName  -> [PageName] -> IO [PageName]
 computeBackRefs path page allPages = do
   let filteredPages = filter (page /=) allPages
   markRefs <- mapM (fmap containsBackref . TIO.readFile . fileNameFor path) filteredPages
   let pageBoolPairs = zip filteredPages markRefs
   return $ map fst (filter snd pageBoolPairs)
   where
-    containsBackref content = T.pack page `T.isInfixOf` content
+    containsBackref content = asText page `T.isInfixOf` content
 
-computeMaybeBackrefs :: FilePath -> FilePath -> Maybe Text -> IO (Maybe [String])
-computeMaybeBackrefs path page maybeShowRefs =
+computeMaybeBackrefs :: FilePath -> PageName -> Maybe Text -> IO (Maybe [PageName])
+computeMaybeBackrefs path pageName maybeShowRefs =
   case maybeShowRefs of
     Nothing -> return Nothing
     Just _ -> do
       allPages <- computeIndex path
-      backrefs <- computeBackRefs path page allPages
+      backrefs <- computeBackRefs path pageName allPages
       return $ Just backrefs
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]

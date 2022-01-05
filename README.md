@@ -1,8 +1,13 @@
 # HsWiki
 
+<a href="https://github.com/thma/HsWiki/actions"><img src="https://github.com/thma/HsWiki/workflows/Haskell%20CI/badge.svg" alt="Actions Status" /></a> 
+<a href="https://github.com/thma/HsWiki"><img src="https://thma.github.io/img/forkme.png" height="20"></a></p>
+
 ## Abstract 
-n this blog post I'm presenting an implementation of a Wiki System 
+In this blog post I'm presenting an implementation of a Wiki System 
 in the spirit of the legendary [C2-Wiki](http://wiki.c2.com/) - written in Haskell with the [Yesod](https://www.yesodweb.com/) framework.
+
+There will also be some nice add-ons like a graphical reprentation of the page links.
 
 ## Introduction 
 
@@ -37,7 +42,7 @@ In the following I'm going to explain how I implemented each of those features.
 ## A simple markup language: Just use Markdown
 
 The original WikiWikiWeb markup language provided basic syntax for layouting text content. 
-Modern markup languages like Markdown are a more convenient to use, provide much more features and are widely used.
+Modern markup languages like Markdown are a more convenient to use, provide much more features and are already widely used.
 So I'm going to use Markdown instead of the original markup language.
 
 ## Rendering content as HTML
@@ -84,7 +89,7 @@ wikiWordMatch :: Regex
 wikiWordMatch = "([A-Z][a-z0-9]+){2,}"    
 ```
 
-The `PathPiece` instance declaration is required to use the `PageName` as part of a Yesod route definition:
+The following `PathPiece` instance declaration is required to use the `PageName` as part of a Yesod route definition:
 
 ```haskell
 instance PathPiece PageName where

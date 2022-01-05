@@ -15,6 +15,7 @@ import           Data.List       (nub)
 import           Data.Text       (Text)
 import qualified Data.Text       as T (pack, unpack)
 import           Text.Blaze.Html (Html, preEscapedToHtml, text, toHtml)
+import PageName (PageName, asString)
 
 menuBar :: Text -> Html
 menuBar page = renderMdToHtml $ mdMenu page
@@ -71,13 +72,13 @@ buildEditorFor page markdown =
       pageFooter
     ]
 
-buildIndex :: [String] -> Html
+buildIndex :: [PageName] -> Html
 buildIndex index =
   toHtml
     [ pageHeader False,
       menuBar "",
       renderMdToHtml "# Table of contents \n",
-      renderMdToHtml $ T.pack $ concatMap (\page -> "- [" ++ page ++ "](/" ++ page ++ ") \n") index,
+      renderMdToHtml $ T.pack $ concatMap (\page -> "- [" ++ asString page ++ "](/" ++ asString page ++ ") \n") index,
       pageFooter
     ]
 
@@ -109,7 +110,7 @@ searchBox search =
       ++ "<input type=\"submit\" value=\"find\" />"
       ++ "</form>"
 
-buildGraphView :: [([String], String)] -> Html
+buildGraphView :: [([PageName], PageName)] -> Html
 buildGraphView graph =
   toHtml
     [ pageHeader False,
