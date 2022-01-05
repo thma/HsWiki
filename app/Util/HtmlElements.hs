@@ -61,14 +61,14 @@ buildEditorFor pageName markdown =
       renderMdToHtml $ "# " <> page <> " \n",
       preEscapedToHtml $
         "<form action=\""
-          ++ T.unpack page
-          ++ "\" method=\"POST\">"
-          ++ "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">"
-          ++ T.unpack markdown
-          ++ "</textarea>"
-          ++ "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; "
-          ++ "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
-          ++ "</form>",
+          <> page
+          <> "\" method=\"POST\">"
+          <> "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">"
+          <> markdown
+          <> "</textarea>"
+          <> "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; "
+          <> "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
+          <> "</form>",
       pageFooter
     ]
   where page = asText pageName

@@ -160,14 +160,49 @@ getEditR pageName = do
   markdown <-
     if exists
       then liftIO $ TIO.readFile fileName    -- if file exists, assign markdown with file content
-      else return newPage                    -- else assign markdown with some default content
-  return $ buildEditorFor pageName markdown  -- build Html for an Editor page, fill it with markdown content
+      else return newPage                    -- else assign markdown with default content
+  return $ buildEditorFor pageName markdown  -- return Html for an Editor page
 
 -- | retrieve the name of the HsWiki {contentDir} attribute
 getDocumentRoot :: Handler String
 getDocumentRoot = getsYesod contentDir  
+
+-- | create default content for a new page
+newPage :: Text
+newPage =
+     "Use WikiWords in PascalCase for Links. \n\n"
+  <> "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
 ```
 
+Next we'll have a look at the `buildEditorFor` function that will generate the actual Html content of the editor page:
+
+
+```haskell
+buildEditorFor :: PageName -> Text -> Html
+buildEditorFor pageName markdown =
+  toHtml
+    [ pageHeader False,
+      menuBar page,
+      renderMdToHtml $ "# " <> page <> " \n",
+      preEscapedToHtml $
+        "<form action=\"" <> page <> "\" method=\"POST\">"
+          <> "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">"
+          <> markdown
+          <> "</textarea>"
+          <> "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; "
+          <> "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
+          <> "</form>",
+      pageFooter
+    ]
+  where page = asText pageName
+```
+
+The most important element here is the creation of an Html `<form ...>...</form> element.
+The action for that form is just the same page but with a `POST`-method (we'll come to the respective handler function `postEditR` shortly).
+
+The resulting Html will look like this in a browser:
+
+![The Editor for a new page](img/editor.png)
 
 
 ```haskell
