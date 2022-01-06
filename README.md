@@ -154,7 +154,7 @@ postEditR :: PageName -> Handler Html
 
 ### serving an editor
 
-Now let's study the implementation of these two function step by step
+Now let's study the implementation of these two function step by step, first the GET handler:
 
 ```haskell
 -- | handler for GET /edit/#PageName
@@ -169,16 +169,22 @@ getEditR pageName = do
       else return newPage                    -- else assign markdown with default content
   return $ buildEditorFor pageName markdown  -- return Html for an Editor page
 
--- | retrieve the name of the HsWiki {contentDir} attribute
+-- | retrieve the name of the HsWiki {contentDir} attribute, defaults to 'content'
 getDocumentRoot :: Handler String
 getDocumentRoot = getsYesod contentDir  
+
+-- | construct the proper file name for a PageName
+fileNameFor :: FilePath -> PageName  -> FilePath
+fileNameFor path pageName = path ++ "/" ++ asString pageName ++ ".md"
 
 -- | create default content for a new page
 newPage :: Text
 newPage =
      "Use WikiWords in PascalCase for Links. \n\n"
-  <> "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
+  <> "Use [Markdown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
 ```
+
+As we can see from the reading of markdown content from files, the idea is to just keep all pages as static content files in the filesystem. By default these files reside in the local folder *content* (this folder can be configured by a commandline argument).
 
 Next we'll have a look at the `buildEditorFor` function that will generate the actual Html content of the editor page:
 
@@ -191,42 +197,53 @@ buildEditorFor pageName markdown =
       menuBar "",
       renderMdToHtml $ "# " <> page <> " \n",
       preEscapedToHtml $
-        "<form action=\"" <> page <> "\" method=\"POST\">"
+        "<form action=\""
+          <> page
+          <> "\" method=\"POST\">"
           <> "<textarea style=\"height: auto;\" name=\"content\" cols=\"120\" rows=\"25\">"
           <> markdown
           <> "</textarea>"
           <> "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; "
-          <> "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
+          <> "<input class=\"button button-outline\" type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
           <> "</form>",
       pageFooter
     ]
   where page = asText pageName
-```
+  ```
 
 The most important element here is the creation of an Html `<form ...>...</form> element.
 The action for that form is just the same page but with a `POST`-method (we'll come to the respective handler function `postEditR` shortly).
 
-The resulting Html will look like this in a browser:
+The resulting Html for editing a new page 'BrandNewPage' will look like this in a browser:
 
 ![The Editor for a new page](img/editor.png)
 
+As we can see, I've applied some basic CSS styling [(using Milligram CSS)](https://milligram.io/). This is done in the `pageHeader` function.
+
+### processing the posting of data
+
+The editor has two buttons, *SAVE* and *CANCEL*. On cancel we just navigate back to the previous page in the browser history. On save the browser sends the form data via the `POST` method to the server. To handle this incoming POST-request we'll the `postEditR` handler function:
 
 ```haskell
 postEditR :: PageName -> Handler Html
-postEditR page = do
-  path <- getDocumentRoot
-  let pageStr = asString page
-  let fileName = fileNameFor path pageStr
-  maybeContent <- lookupPostParam "content"
-  client <- remoteHost <$> waiRequest
+postEditR pageName = do
+  path <- getDocumentRoot                    -- obtain path to document root
+  let fileName = fileNameFor path pageName   -- construct a file from the page name
+  maybeContent <- lookupPostParam "content"  -- retrieve POST data
+  client <- remoteHost <$> waiRequest        -- retrieve info on remote client from request
   case maybeContent of
     Just content -> liftIO $ do
-      TIO.writeFile fileName content
-      writeLogEntry path pageStr client
-    Nothing -> redirect $ PageR page
-  redirect $ PageR page
-```
+      TIO.writeFile fileName content         -- if content exists write it to disk
+      writeLogEntry path pageName client     -- also write a log entry to file RecentChanges
+    Nothing -> return ()                     -- no content: do nothing
+  redirect $ PageR pageName                  -- redirect to GET Page route (display content)
+  ```
 
+So essentially we are just writing the markdown content into a file. After that we redirect to 
+the page renderer:
+
+
+![render existing page](img/renderPage.png)
 
 
 

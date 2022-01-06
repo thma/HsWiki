@@ -67,7 +67,7 @@ buildEditorFor pageName markdown =
           <> markdown
           <> "</textarea>"
           <> "<input type=\"submit\" name=\"save\" value=\"save\" /> &nbsp; "
-          <> "<input type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
+          <> "<input class=\"button button-outline\" type=\"button\" name=\"cancel\" value=\"cancel\" onClick=\"window.history.back()\" /> "
           <> "</form>",
       pageFooter
     ]
@@ -174,7 +174,7 @@ renderMdToHtml = preEscapedToHtml . commonmarkToHtml [] []
 newPage :: Text
 newPage =
      "Use WikiWords in PascalCase for Links. \n\n"
-  <> "Use [MarkDown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
+  <> "Use [Markdown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
 
 mdMenu :: Text -> Text
 mdMenu page =

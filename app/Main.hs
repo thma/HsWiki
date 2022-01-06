@@ -99,16 +99,16 @@ getEditR pageName = do
 
 postEditR :: PageName -> Handler Html
 postEditR pageName = do
-  path <- getDocumentRoot
-  let fileName = fileNameFor path pageName
-  maybeContent <- lookupPostParam "content"
-  client <- remoteHost <$> waiRequest
+  path <- getDocumentRoot                    -- obtain path to document root
+  let fileName = fileNameFor path pageName   -- construct a file from the page name
+  maybeContent <- lookupPostParam "content"  -- retrieve POST data
+  client <- remoteHost <$> waiRequest        -- retrieve info on remote client from request
   case maybeContent of
     Just content -> liftIO $ do
-      TIO.writeFile fileName content
-      writeLogEntry path pageName client
-    Nothing -> redirect $ PageR pageName
-  redirect $ PageR pageName
+      TIO.writeFile fileName content         -- if content exists write it to disk
+      writeLogEntry path pageName client     -- also write a log entry to file RecentChanges
+    Nothing -> return ()                     -- no content: do nothing
+  redirect $ PageR pageName                  -- redirect to GET Page route (display content)
 
 getFindR :: Handler Html
 getFindR = do
@@ -137,15 +137,14 @@ writeLogEntry path pageName client = do
   TIO.appendFile logFile logEntry
 
 -- helper functions
+
+-- | retrieve the name of the HsWiki {contentDir} attribute, defaults to 'content'
 getDocumentRoot :: Handler String
 getDocumentRoot = getsYesod contentDir
 
-fileNameFor :: FilePath -> PageName  -> String
-fileNameFor path pageName =
-  path ++ "/" ++ asString pageName
-    ++ if ".md~" `isSuffixOf` asString pageName
-      then ""
-      else ".md"
+-- | construct the proper file name for a PageName
+fileNameFor :: FilePath -> PageName  -> FilePath
+fileNameFor path pageName = path ++ "/" ++ asString pageName ++ ".md"
 
 computeIndex :: FilePath -> IO [PageName]
 computeIndex path = do
