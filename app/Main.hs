@@ -81,7 +81,7 @@ getPageR pageName = do
   if exists
     then do
       content <- liftIO $ TIO.readFile fileName
-      return $ buildViewFor (asText pageName) (wikiWordToMdLink content) maybeBackrefs
+      return $ buildViewFor (asText pageName) content maybeBackrefs
     else do
       redirect $ EditR pageName
 

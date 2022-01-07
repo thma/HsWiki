@@ -214,7 +214,7 @@ buildEditorFor pageName markdown =
 The most important element here is the creation of an Html `<form ...>...</form> element.
 The action for that form is just the same page but with a `POST`-method (we'll come to the respective handler function `postEditR` shortly).
 
-The resulting Html for editing a new page 'BrandNewPage' will look like this in a browser:
+Now imagine we point our browser to `http://localhost:3000/edit/BrandNewPage`. Yesod will do the routing to `getEditR (Page "BrandNewPage")` and the generated Html for editing a new page 'BrandNewPage' will be sent back to the browser. The page will look like this:
 
 ![The Editor for a new page](img/editor.png)
 
@@ -240,17 +240,19 @@ postEditR pageName = do
   ```
 
 So essentially we are just writing the markdown content into a file. After that we redirect to 
-the page renderer:
-
+the `PageR` route. This will result in redirecting the browser to `http://localhost:3000/BrandNewPage`. As you can see in the following screen shot the markdown content that was entered in the editor from is now rendered as HTML:
 
 ![render existing page](img/renderPage.png)
 
+```haskell
+
+```
 
 
 
 
 
-
+# All the rest is still Work in progress !
 
 
 ## Features
@@ -263,12 +265,20 @@ the page renderer:
 
 
 
-
-
 ## How to build
     stack init
     stack install
     HsWiki
+
+### Installation under Windows
+
+Under Windows you will have to install the ICU library. I used the latest win64 version from https://github.com/unicode-org/icu/releases/tag/release-70-1. You'll have to manually copy *.ddl and *.h files to the following locations: 
+
+- The actual lib files go to `C:\Users\<username>\AppData\Local\Programs\stack\x86_64-windows\msys2-<installdate>\mingw64\lib`
+  Don't forget to strip version number from the .dll files (so icuuc70.dll becomes icuuc.dll)
+- The include files go to `C:\Users\<username>\AppData\Local\Programs\stack\x86_64-windows\msys2-<installdate>\mingw64\include\unicode`
+
+
 
 ## How to deploy as docker container
 1. clone the [AlpineHaskell](https://github.com/thma/AlpineHaskell) project:

@@ -13,9 +13,9 @@ where
 import           CMarkGFM        (commonmarkToHtml)
 import           Data.List       (nub)
 import           Data.Text       (Text)
-import qualified Data.Text       as T (pack, unpack)
+import qualified Data.Text       as T (pack, unpack, intercalate)
 import           Text.Blaze.Html (Html, preEscapedToHtml, text, toHtml)
-import PageName (PageName, asString, asText)
+import PageName (PageName, asString, asText, wikiWordToMdLink)
 
 menuBar :: Text -> Html
 menuBar page = renderMdToHtml $ mdMenu page
@@ -44,8 +44,13 @@ buildViewFor page content maybeBackrefs =
         Nothing       -> (False, text "")
         Just backrefs -> (True, renderedBackrefs)
           where
-            renderedBackrefs = renderMdToHtml $ T.pack $ concatMap ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asString) backrefs
-   in toHtml [pageHeader False, menuBar page, pageTitle (T.unpack page) hasBackref, backrefEntry, renderMdToHtml content, pageFooter]
+            renderedBackrefs = renderMdToHtml $ T.intercalate "\n" $ map ((\b -> "- [" <> b <> "](/" <> b <> ") ") . asText) backrefs
+   in toHtml [pageHeader False, 
+              menuBar page, 
+              pageTitle (T.unpack page) hasBackref, 
+              backrefEntry, 
+              renderMdToHtml (wikiWordToMdLink content), 
+              pageFooter]
 
 pageTitle :: String -> Bool -> Html
 pageTitle pageName hasBackref =
