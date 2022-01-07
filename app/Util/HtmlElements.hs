@@ -44,7 +44,9 @@ buildViewFor page content maybeBackrefs =
         Nothing       -> (False, text "")
         Just backrefs -> (True, renderedBackrefs)
           where
-            renderedBackrefs = renderMdToHtml $ T.intercalate "\n" $ map ((\b -> "- [" <> b <> "](/" <> b <> ") ") . asText) backrefs
+            concatMap :: (a -> Text) -> [a] -> Text
+            concatMap = (T.intercalate "" .) . map
+            renderedBackrefs = renderMdToHtml $ concatMap ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asText) backrefs
    in toHtml [pageHeader False, 
               menuBar page, 
               pageTitle (T.unpack page) hasBackref, 
@@ -92,7 +94,7 @@ buildFindPage :: Text -> [PageName] -> Html
 buildFindPage search pages = toHtml
   [ pageHeader True,
     menuBar "",
-    renderMdToHtml $ T.pack "# FindPage ",
+    renderMdToHtml "# FindPage ",
     searchBox search,
     renderMdToHtml $ T.pack $ concatMap (\p -> "- [" ++ asString p ++ "](/" ++ asString p ++ ") \n") pages,
     pageFooter

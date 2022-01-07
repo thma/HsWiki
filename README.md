@@ -127,23 +127,6 @@ getPageR :: PageName -> Handler Html
 
 This function will have to lookup an existing page, render its Markdown content to Html and return it a `Handler Html` object. We'll have a look at this function shortly.
 
-<!--
-```haskell
-getPageR :: PageName -> Handler Html
-getPageR page = do
-  path <- getDocumentRoot
-  maybeShowRefs <- lookupGetParam "showBackrefs"
-  maybeBackrefs <- liftIO $ computeMaybeBackrefs path (asString page) maybeShowRefs
-  let fileName = fileNameFor path (asString page)
-  exists <- liftIO $ doesFileExist fileName
-  if exists
-    then do
-      content <- liftIO $ TIO.readFile fileName
-      return $ buildViewFor (asText page) (wikiWordToMdLink content) maybeBackrefs
-    else do
-      redirect $ EditR page
-```
---> 
 
 The definition (2) states that for any route /edit/`PageName` two functions must be defined, one for GET one for POST:
 
@@ -240,12 +223,49 @@ postEditR pageName = do
   ```
 
 So essentially we are just writing the markdown content into a file. After that we redirect to 
-the `PageR` route. This will result in redirecting the browser to `http://localhost:3000/BrandNewPage`. As you can see in the following screen shot the markdown content that was entered in the editor from is now rendered as HTML:
+the `PageR` route. This will result in redirecting the browser to `http://localhost:3000/BrandNewPage`. As you can see in the following screen-shot the markdown content that was entered in the editor form is now rendered as HTML:
 
 ![render existing page](img/renderPage.png)
 
-```haskell
+As promised above we'll now have a closer look at the `getPageR` route handler function:
 
+```haskell
+-- | Handler for GET /#PageName
+getPageR :: PageName -> Handler Html
+getPageR pageName = do
+  path <- getDocumentRoot                            -- obtain path to document root 
+  maybeShowRefs <- lookupGetParam "showBackrefs"     -- check whether URL ends with '?showBackrefs'
+  maybeBackrefs <- liftIO $                          -- if showBackrefs was set, Just [PageName] 
+    computeMaybeBackrefs path pageName maybeShowRefs -- else Nothing
+  let fileName = fileNameFor path pageName           -- compute proper filename from pageName
+  exists <- liftIO $ doesFileExist fileName          -- check whether such a file exists
+  if exists
+    then do                                                                  
+      content <- liftIO $ TIO.readFile fileName      -- file exists, read its content
+      return $ buildViewFor 
+        (asText pageName) content maybeBackrefs      -- build HTML for content and return it
+    else do
+      redirect $ EditR pageName                      -- file does not exist, redirect to EditR
+```
+
+
+
+```haskell
+buildViewFor :: Text -> Text -> Maybe [PageName] -> Html
+buildViewFor page content maybeBackrefs =
+  let (hasBackref, backrefEntry) = case maybeBackrefs of
+        Nothing       -> (False, text "")
+        Just backrefs -> (True, renderedBackrefs)
+          where
+            concatMap :: (a -> Text) -> [a] -> Text
+            concatMap = (T.intercalate "" .) . map
+            renderedBackrefs = renderMdToHtml $ concatMap ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asText) backrefs
+   in toHtml [pageHeader False, 
+              menuBar page, 
+              pageTitle (T.unpack page) hasBackref, 
+              backrefEntry, 
+              renderMdToHtml (wikiWordToMdLink content), 
+              pageFooter]
 ```
 
 

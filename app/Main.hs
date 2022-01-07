@@ -71,19 +71,22 @@ getGraphR = do
   allRefs  <- liftIO $ mapM (\p -> computeBackRefs path p allPages) allPages
   return $ buildGraphView $ zip allRefs allPages
 
+-- | Handler for GET /#PageName
 getPageR :: PageName -> Handler Html
 getPageR pageName = do
-  path <- getDocumentRoot
-  maybeShowRefs <- lookupGetParam "showBackrefs"
-  maybeBackrefs <- liftIO $ computeMaybeBackrefs path pageName maybeShowRefs
-  let fileName = fileNameFor path pageName
-  exists <- liftIO $ doesFileExist fileName
+  path <- getDocumentRoot                            -- obtain path to document root 
+  maybeShowRefs <- lookupGetParam "showBackrefs"     -- check whether URL ends with '?showBackrefs'
+  maybeBackrefs <- liftIO $ 
+    computeMaybeBackrefs path pageName maybeShowRefs -- if showBackrefs was set, Just [PageName] else Nothing
+  let fileName = fileNameFor path pageName           -- compute proper filename from pageName
+  exists <- liftIO $ doesFileExist fileName          -- check whether such a file exists
   if exists
-    then do
-      content <- liftIO $ TIO.readFile fileName
-      return $ buildViewFor (asText pageName) content maybeBackrefs
+    then do                                                                  
+      content <- liftIO $ TIO.readFile fileName      -- file exists, read its content
+      return $ buildViewFor 
+        (asText pageName) content maybeBackrefs      -- build HTML for content and return it
     else do
-      redirect $ EditR pageName
+      redirect $ EditR pageName                      -- file does not exist, redirect to EditR
 
 -- | handler for GET /edit/#PageName
 getEditR :: PageName -> Handler Html
