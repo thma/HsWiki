@@ -18,7 +18,7 @@ import           Text.Blaze.Html (Html, preEscapedToHtml, text, toHtml)
 import PageName (PageName, asString, asText, wikiWordToMdLink)
 
 menuBar :: Text -> Html
-menuBar page = renderMdToHtml $ mdMenu page
+menuBar pageName = renderMdToHtml $ mdMenu pageName
 
 pageHeader :: Bool -> Html
 pageHeader renderInit =
@@ -38,8 +38,8 @@ pageHeader renderInit =
 pageFooter :: Html
 pageFooter = preEscapedToHtml ("\r\n</div></body></html>" :: Text)
 
-buildViewFor :: Text -> Text -> Maybe [PageName] -> Html
-buildViewFor page content maybeBackrefs =
+buildViewFor :: PageName -> Text -> Maybe [PageName] -> Html
+buildViewFor pageName content maybeBackrefs =
   let (hasBackref, backrefEntry) = case maybeBackrefs of
         Nothing       -> (False, text "")
         Just backrefs -> (True, renderedBackrefs)
@@ -48,17 +48,18 @@ buildViewFor page content maybeBackrefs =
             concatMap = (T.intercalate "" .) . map
             renderedBackrefs = renderMdToHtml $ concatMap ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asText) backrefs
    in toHtml [pageHeader False, 
-              menuBar page, 
-              pageTitle (T.unpack page) hasBackref, 
+              menuBar (asText pageName), 
+              pageTitle pageName hasBackref, 
               backrefEntry, 
               renderMdToHtml (wikiWordToMdLink content), 
               pageFooter]
 
-pageTitle :: String -> Bool -> Html
+pageTitle :: PageName -> Bool -> Html
 pageTitle pageName hasBackref =
   if hasBackref
-    then renderMdToHtml $ T.pack $ "# [" <> pageName <> "](" <> pageName <> ")"
-    else renderMdToHtml $ T.pack $ "# [" <> pageName <> "](" <> pageName <> "?showBackrefs)"
+    then renderMdToHtml $ "# [" <> pageT <> "](" <> pageT <> ")"
+    else renderMdToHtml $ "# [" <> pageT <> "](" <> pageT <> "?showBackrefs)"
+      where pageT = asText pageName
 
 buildEditorFor :: PageName -> Text -> Html
 buildEditorFor pageName markdown =
@@ -183,12 +184,11 @@ newPage =
      "Use WikiWords in PascalCase for Links. \n\n"
   <> "Use [Markdown](https://github.com/adam-p/markdown-here/wiki/Markdown-Cheatsheet) to format page content"
 
-mdMenu :: Text -> Text
-mdMenu page =
-  T.pack $
+mdMenu :: Text  -> Text
+mdMenu pageName =
     "[home](/) | [site map](/actions/graph) |  [recent changes](/RecentChanges) | [find](/actions/find) | "
-      ++ ( if page == ""
+      <> ( if pageName == ""
              then "edit"
-             else "[edit](/edit/" ++ T.unpack page ++ ")"
+             else "[edit](/edit/" <> pageName <> ")"
          )
-      ++ " | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n"
+      <> " | &nbsp;&nbsp;&nbsp;&nbsp; built with [HsWiki](https://github.com/thma/HsWiki) \r\n\r\n"

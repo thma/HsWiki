@@ -227,6 +227,8 @@ the `PageR` route. This will result in redirecting the browser to `http://localh
 
 ![render existing page](img/renderPage.png)
 
+### rendering page content
+
 As promised above we'll now have a closer look at the `getPageR` route handler function:
 
 ```haskell
@@ -243,16 +245,26 @@ getPageR pageName = do
     then do                                                                  
       content <- liftIO $ TIO.readFile fileName      -- file exists, read its content
       return $ buildViewFor 
-        (asText pageName) content maybeBackrefs      -- build HTML for content and return it
+        pageName content maybeBackrefs               -- build HTML for content and return it
     else do
       redirect $ EditR pageName                      -- file does not exist, redirect to EditR
 ```
 
+Let's ignore the lines with `maybeShowRefs` and `maybeBackrefs` for a moment. We just assume that `maybeBackrefs == Nothing`. So we first check whether a file exists for the given `pageName`. If yes, the file-content is read and bound to `content`; next we build a HTML view for the page with `buildViewFor` and return it. If no file was found matching `pageName` we redirect directly to the `EditR`which will in turn open up an editor for an empty page as already shown in the previous section.
 
+Let's have a closer look at `buildViewFor`. It will first evaluate the `maybeBackrefs` arguments. For the moment let's assume equals `Nothing`, so that `hasBackref` is bound to `True` and `backrefEntry` to `""`. 
+
+Then the actual HTML for the page is constructed from a set of template functions: 
+- `pageHeader` creates the HTML head with css definitions, 
+- `menuBar` creates the menu line on top of the page, 
+- `pageTitle` creates a headline from the `pageName`, 
+- `backrefEntry` is just empty text in this scenario
+- `renderMdToHtml (wikiWordToMdLink content)` first replaces all ocurrences of *WikiWords* with proper Markdown hyperlinks of the form `[WikiWord](WikiWord)` the result is then rendered to HTML (this is the single place where we convert from *WikiWords* to hyperlinks and thus make the Wiki magic happen...), 
+- finally `pageFooter` closes all open html tags:
 
 ```haskell
-buildViewFor :: Text -> Text -> Maybe [PageName] -> Html
-buildViewFor page content maybeBackrefs =
+buildViewFor :: PageName -> Text -> Maybe [PageName] -> Html
+buildViewFor pageName content maybeBackrefs =
   let (hasBackref, backrefEntry) = case maybeBackrefs of
         Nothing       -> (False, text "")
         Just backrefs -> (True, renderedBackrefs)
@@ -261,12 +273,26 @@ buildViewFor page content maybeBackrefs =
             concatMap = (T.intercalate "" .) . map
             renderedBackrefs = renderMdToHtml $ concatMap ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asText) backrefs
    in toHtml [pageHeader False, 
-              menuBar page, 
-              pageTitle (T.unpack page) hasBackref, 
+              menuBar (asText pageName), 
+              pageTitle pageName hasBackref, 
               backrefEntry, 
               renderMdToHtml (wikiWordToMdLink content), 
               pageFooter]
+
+-- | converts a WikiWord into a Markdown link: [WikiWord](WikiWord)
+wikiWordToMdLink :: Text -> Text
+wikiWordToMdLink text =
+  let match = wikiWordMatch
+      replace = "[$0]($0)"
+   in replaceAll match replace text              
 ```
+
+## Displaying back links (aka reverse index) for each page
+
+[BackLink defined](http://wiki.c2.com/?BackLink)
+[ReverseIndex defined](http://wiki.c2.com/?ReverseIndex)
+
+
 
 
 

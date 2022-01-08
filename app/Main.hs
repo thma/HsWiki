@@ -84,7 +84,7 @@ getPageR pageName = do
     then do                                                                  
       content <- liftIO $ TIO.readFile fileName      -- file exists, read its content
       return $ buildViewFor 
-        (asText pageName) content maybeBackrefs      -- build HTML for content and return it
+        pageName content maybeBackrefs               -- build HTML for content and return it
     else do
       redirect $ EditR pageName                      -- file does not exist, redirect to EditR
 
