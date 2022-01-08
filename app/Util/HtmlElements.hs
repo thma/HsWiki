@@ -23,7 +23,7 @@ menuBar pageName = renderMdToHtml $ mdMenu pageName
 pageHeader :: Bool -> Html
 pageHeader renderInit =
   preEscapedToHtml (
-    let initBlock = if renderInit then "onload=\"init()\"" else ""
+    let initBlock = if renderInit then " onload=\"init()\"" else ""
     in
       "<!DOCTYPE html>\r\n<html>\r\n<head>\r\n"
         <> "<title>HsWiki</title>\r\n"
@@ -113,7 +113,7 @@ searchBox search =
     ++
     "<form action=\"/actions/find\""
       ++ " method=\"GET\">"
-      ++ "<input type=\"text\" id=\"search\" name=\"search\" value=\"" ++ T.unpack search ++ "\" "
+      ++ "<input type=\"text\" id=\"search\" name=\"search\" size=\"50\" value=\"" ++ T.unpack search ++ "\" "
       ++ "onfocus=\"this.setSelectionRange(9999, 9999)\" "
       ++ "onkeyup=\"this.form.submit()\" /> "
       ++ "<input type=\"submit\" value=\"find\" />"

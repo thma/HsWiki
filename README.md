@@ -385,16 +385,56 @@ buildViewFor pageName content maybeBackrefs =
               pageFooter]        
 ```
 
+## Show the latest creation and edits to pages 
+
+I already covered the `postEditR` function, but I did not explain the `writeLogEntry` function which traces each change to page-content. So here comes the full picture:
+
+```haskell
+postEditR :: PageName -> Handler Html
+postEditR pageName = do
+  path <- getDocumentRoot                    -- obtain path to document root
+  let fileName = fileNameFor path pageName   -- construct a file from the page name
+  maybeContent <- lookupPostParam "content"  -- retrieve POST data
+  client <- remoteHost <$> waiRequest        -- retrieve info on remote client from request
+  case maybeContent of
+    Just content -> liftIO $ do
+      TIO.writeFile fileName content         -- if content exists write it to disk
+      writeLogEntry path pageName client     -- also write a log entry to file RecentChanges
+    Nothing -> return ()                     -- no content: do nothing
+  redirect $ PageR pageName                  -- redirect to GET Page route (display content)
+  
+-- | write a log entry to the RecentChanges page
+writeLogEntry :: FilePath -> PageName -> SockAddr -> IO ()
+writeLogEntry path pageName client = do
+  let fileName = fileNameFor path recentChanges -- path to RecentChanges page
+  now <- getCurrentTime                         -- create timestamp
+  let logEntry = toStrict $                     -- create a log entry consisting of:
+        format ("- " % string % " " % string % " from " % string % "\n")
+          (asString pageName)                   -- page edited/created
+          (takeWhile (/= '.') (show now))       -- current timestamp
+          (takeWhile (/= ':') (show client))    -- IP address of client
+  TIO.appendFile fileName logEntry              -- add log entry at end of log file
+
+-- | the RecentChanges PageName
+recentChanges :: PageName
+recentChanges = Page "RecentChanges"
+```
+
+And here comes a sample screen shot of the RecentChanges page:
+
+![RecentChanges](img/RecentChanges.png)
+
+## Have a full text search
+
+![FindPage](img/FindPage.png)
+
+## Provide a graph view of pages and their links
+
+![SiteMap](img/SiteMap.png)
 
 # All the rest is still Work in progress !
 
 
-## Features
-* Markup of wiki content is done with (Github flavoured) MarkDown.
-* Automatic generation of new pages if non-existing local links are followed by the browser.
-  (So to generate a new page just create a new link [new page](new_page) and click the new link.)
-* An automatically generated table of contents is available
-* For each page it's possible to view a list of all other pages linking back to it.
 
 
 

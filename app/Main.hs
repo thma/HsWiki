@@ -100,6 +100,7 @@ getEditR pageName = do
       else return newPage                    -- else assign markdown with some default content
   return $ buildEditorFor pageName markdown  -- build Html for an Editor page, fill it with markdown content
 
+-- | handler for POST /edit/#PageName
 postEditR :: PageName -> Handler Html
 postEditR pageName = do
   path <- getDocumentRoot                    -- obtain path to document root
@@ -128,16 +129,17 @@ getFindR = do
       let matchingPages = map fst (filter snd pageBoolPairs)
       return $ buildFindPage search matchingPages
 
+-- | write a log entry to the RecentChanges page
 writeLogEntry :: FilePath -> PageName -> SockAddr -> IO ()
 writeLogEntry path pageName client = do
-  let logFile = fileNameFor path recentChanges 
-  now <- getCurrentTime
-  let logEntry = toStrict $
+  let fileName = fileNameFor path recentChanges -- path to RecentChanges page
+  now <- getCurrentTime                         -- create timestamp
+  let logEntry = toStrict $                     -- create a log entry consisting of:
         format ("- " % string % " " % string % " from " % string % "\n")
-          (asString pageName)
-          (takeWhile (/= '.') (show now))
-          (takeWhile (/= ':') (show client))
-  TIO.appendFile logFile logEntry
+          (asString pageName)                   -- page edited/created
+          (takeWhile (/= '.') (show now))       -- current timestamp
+          (takeWhile (/= ':') (show client))    -- IP address of client
+  TIO.appendFile fileName logEntry              -- add log entry at end of log file
 
 -- helper functions
 
