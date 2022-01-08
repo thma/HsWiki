@@ -6,7 +6,7 @@
 
 module Main where
 
-import           Data.List              (isSuffixOf, sort)
+import           Data.List              (isSuffixOf, sort, delete)
 import           Data.List.Extra        (dropSuffix)
 import           Data.Text              (Text)
 import qualified Data.Text              as T (isInfixOf, pack, toLower, toLower)
@@ -155,24 +155,28 @@ computeIndex path = do
   let pages = sort $ map (dropSuffix ".md") $ removeAll ["touch", "favicon.ico.md", "RecentChanges.md"] allFiles
   return $ map (fromMaybe  undefined) $ filter isJust $ map (pageName . T.pack) pages
 
-
-computeBackRefs :: FilePath -> PageName  -> [PageName] -> IO [PageName]
-computeBackRefs path page allPages = do
-  let filteredPages = filter (page /=) allPages
-  markRefs <- mapM (fmap containsBackref . TIO.readFile . fileNameFor path) filteredPages
-  let pageBoolPairs = zip filteredPages markRefs
-  return $ map fst (filter snd pageBoolPairs)
+-- | compute a list of all pages that contain references to pageName
+computeBackRefs :: FilePath -> PageName -> [PageName] -> IO [PageName]
+computeBackRefs path pageName allPages = do
+  let filteredPages = delete pageName allPages   -- filter pagename from list of pages (avoid self refs)
+  markRefs <- mapM                               -- create a list of bools: True if a page contains a ref,
+    (fmap containsBackref . TIO.readFile . fileNameFor path) -- else False
+    filteredPages
+  let pageBoolPairs = zip filteredPages markRefs -- create a zipped list of (pageName, Bool) pairs
+  return $ map fst (filter snd pageBoolPairs)    -- return only pages marked True
   where
-    containsBackref content = asText page `T.isInfixOf` content
+    containsBackref content =                    -- returns True if content contains pageName, else False
+      asText pageName `T.isInfixOf` content
 
+-- | if maybeShowRefs isJust then a list of a pages referencing pageName is computed
 computeMaybeBackrefs :: FilePath -> PageName -> Maybe Text -> IO (Maybe [PageName])
 computeMaybeBackrefs path pageName maybeShowRefs =
   case maybeShowRefs of
-    Nothing -> return Nothing
-    Just _ -> do
-      allPages <- computeIndex path
-      backrefs <- computeBackRefs path pageName allPages
-      return $ Just backrefs
+    Nothing -> return Nothing                            -- if maybeShowRefs == Nothing, return Nothing
+    Just _  -> do                                        -- else compute list of all references to page by
+      allPages <- computeIndex path                      -- computing list of all pages in wiki
+      backrefs <- computeBackRefs path pageName allPages -- compute all back references
+      return $ Just backrefs                             -- return this list wrapped as a Maybe
 
 removeAll :: (Foldable t, Eq a) => t a -> [a] -> [a]
 removeAll = flip (foldl (flip remove))

@@ -290,28 +290,79 @@ wikiWordToMdLink text =
 ## Displaying back links (aka reverse index) for each page
 
 Another important feature of the original WikiWiki was the seamless integration of back links: 
+
 > If page A links to page B, then a 'back link' would be a link which goes from page B back to page A.
 >
 >On this wiki, the title of each page works as a back link. Clicking on the title of any page finds all the pages referring to that page. It works for any wiki page. E.g. to find all pages that link to this page, click the title at the top of this page.
 >
 > [quoted from the WikiWiki](http://wiki.c2.com/?BackLink)
 
-This feature can best be shown with a little Demo. First we lookup up page `http://localhost:3000/CategoryMammal`, a page meant to represent the class of all mammamĺ animals:
+This feature can best be demonstrated with an example. First we lookup up page `http://localhost:3000/CategoryMammal`, a page meant to represent the class of all mammaĺ animals:
 
 ![CategoryMammal](img/CategoryMammal.png)
 
-As we can see the headline of this page is hyperlink. This link references to `http://localhost:3000/CategoryMammal?showBackrefs`, which result in the following page:
+The headline of this page is a hyperlink which references `http://localhost:3000/CategoryMammal?showBackrefs`. Following the the limk results in the following page:
 
 
 ![CategoryMammal](img/CategoryMammalWithBackLinks.png)
 
-Now we see a bullet list of pages linking to *CategoryMammal* above the normal page content. Following one of these links `http://localhost:3000/SpeciesCat` leads to the following page:
+Now we see a bullet point list of all pages linking to *CategoryMammal* above the normal page content. Following one of these links, e.g. `http://localhost:3000/SpeciesCat`, leads to the following page:
 
 ![SpeciesCat](img/SpeciesCat.png)
 
-At the bottom of this page we the *WikiWord* CategoryMammal. This interpreted as a link from *SpeciesCat* to *CategoryMammal*. And as a result the back-link display on page *CategoryMammal* contains a link to *SpeciesCat*.
+At the bottom of this page we see the *WikiWord* CategoryMammal. This is interpreted as a link from *SpeciesCat* to *CategoryMammal*. And as a result the back-link display on page *CategoryMammal* contains a link to *SpeciesCat*.
 
-Let's see how this works on the code level. In fact we already came across this mechanism but skipped it for the time being. Now it's time to revisit. We start with the `buildViewFor` function.
+Let's see how this works on the code level. In fact we already came across this mechanism but had skipped over it for the time being. Now it's time to revisit. We start with the `getPageR` function.
+
+In our scenario a click on the link `http://localhost:3000/CategoryMammal?showBackrefs` leads to a call to `getPageR`. But this time `lookupGetParam "showBackrefs"` will succeed and thus now `maybeShowRefs` is bound to `Just ""`. This will lead to a different execution path in the call to `computeMaybeBackrefs`:
+
+```haskell
+-- | Handler for GET /#PageName
+getPageR :: PageName -> Handler Html
+getPageR pageName = do
+  path <- getDocumentRoot                            -- obtain path to document root 
+  maybeShowRefs <- lookupGetParam "showBackrefs"     -- check whether URL ends with '?showBackrefs'
+  maybeBackrefs <- liftIO $                          -- if showBackrefs was set, Just [PageName] 
+    computeMaybeBackrefs path pageName maybeShowRefs -- else Nothing
+  let fileName = fileNameFor path pageName           -- compute proper filename from pageName
+  exists <- liftIO $ doesFileExist fileName          -- check whether such a file exists
+  if exists
+    then do                                                                  
+      content <- liftIO $ TIO.readFile fileName      -- file exists, read its content
+      return $ buildViewFor 
+        pageName content maybeBackrefs               -- build HTML for content and return it
+    else do
+      redirect $ EditR pageName                      -- file does not exist, redirect to EditR
+
+-- | if maybeShowRefs isJust then a list of a pages referencing pageName is computed
+computeMaybeBackrefs :: FilePath -> PageName -> Maybe Text -> IO (Maybe [PageName])
+computeMaybeBackrefs path pageName maybeShowRefs =
+  case maybeShowRefs of
+    Nothing -> return Nothing                            -- if maybeShowRefs == Nothing, return Nothing
+    Just _  -> do                                        -- else compute list of all references to page by
+      allPages <- computeIndex path                      -- computing list of all pages in wiki
+      backrefs <- computeBackRefs path pageName allPages -- compute all back references
+      return $ Just backrefs                             -- return this list wrapped as a Maybe
+
+
+-- | compute a list of all pages that contain references to pageName
+computeBackRefs :: FilePath -> PageName -> [PageName] -> IO [PageName]
+computeBackRefs path pageName allPages = do
+  let filteredPages = delete pageName allPages   -- filter pagename from list of pages (avoid self refs)
+  markRefs <- mapM                               -- create a list of bools: True if a page contains a ref,
+    (fmap containsBackref . TIO.readFile . fileNameFor path)             -- else False
+    filteredPages
+  let pageBoolPairs = zip filteredPages markRefs -- create a zipped list of (pageName, Bool) pairs
+  return $ map fst (filter snd pageBoolPairs)    -- return only pages marked True
+  where
+    containsBackref content =                    -- returns True if content contains pageName, else False
+      asText pageName `T.isInfixOf` content
+```
+
+Next we revisit `buildViewFor`. Here we see a case match on `maybeBackrefs`. In our current scenario it will
+match to `Just backrefs`. Thus `renderedBackrefs` will be bound to Html generated by rendering a Markdown list of hyperlinks that is constructed from the `backrefs` list of PageNames. 
+
+This generated Html is then included as `backrefEntry` into the overall page layout:
 
 ```haskell
 buildViewFor :: PageName -> Text -> Maybe [PageName] -> Html
@@ -322,7 +373,10 @@ buildViewFor pageName content maybeBackrefs =
           where
             concatMap :: (a -> Text) -> [a] -> Text
             concatMap = (T.intercalate "" .) . map
-            renderedBackrefs = renderMdToHtml $ concatMap ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asText) backrefs
+            renderedBackrefs = 
+              renderMdToHtml $ concatMap 
+                  ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asText) 
+                  backrefs
    in toHtml [pageHeader False, 
               menuBar (asText pageName), 
               pageTitle pageName hasBackref, 
