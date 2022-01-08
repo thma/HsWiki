@@ -289,13 +289,47 @@ wikiWordToMdLink text =
 
 ## Displaying back links (aka reverse index) for each page
 
-[BackLink defined](http://wiki.c2.com/?BackLink)
-[ReverseIndex defined](http://wiki.c2.com/?ReverseIndex)
+Another important feature of the original WikiWiki was the seamless integration of back links: 
+> If page A links to page B, then a 'back link' would be a link which goes from page B back to page A.
+>
+>On this wiki, the title of each page works as a back link. Clicking on the title of any page finds all the pages referring to that page. It works for any wiki page. E.g. to find all pages that link to this page, click the title at the top of this page.
+>
+> [quoted from the WikiWiki](http://wiki.c2.com/?BackLink)
+
+This feature can best be shown with a little Demo. First we lookup up page `http://localhost:3000/CategoryMammal`, a page meant to represent the class of all mammamĺ animals:
+
+![CategoryMammal](img/CategoryMammal.png)
+
+As we can see the headline of this page is hyperlink. This link references to `http://localhost:3000/CategoryMammal?showBackrefs`, which result in the following page:
 
 
+![CategoryMammal](img/CategoryMammalWithBackLinks.png)
 
+Now we see a bullet list of pages linking to *CategoryMammal* above the normal page content. Following one of these links `http://localhost:3000/SpeciesCat` leads to the following page:
 
+![SpeciesCat](img/SpeciesCat.png)
 
+At the bottom of this page we the *WikiWord* CategoryMammal. This interpreted as a link from *SpeciesCat* to *CategoryMammal*. And as a result the back-link display on page *CategoryMammal* contains a link to *SpeciesCat*.
+
+Let's see how this works on the code level. In fact we already came across this mechanism but skipped it for the time being. Now it's time to revisit. We start with the `buildViewFor` function.
+
+```haskell
+buildViewFor :: PageName -> Text -> Maybe [PageName] -> Html
+buildViewFor pageName content maybeBackrefs =
+  let (hasBackref, backrefEntry) = case maybeBackrefs of
+        Nothing       -> (False, text "")
+        Just backrefs -> (True, renderedBackrefs)
+          where
+            concatMap :: (a -> Text) -> [a] -> Text
+            concatMap = (T.intercalate "" .) . map
+            renderedBackrefs = renderMdToHtml $ concatMap ((\b -> "- [" <> b <> "](/" <> b <> ") \n") . asText) backrefs
+   in toHtml [pageHeader False, 
+              menuBar (asText pageName), 
+              pageTitle pageName hasBackref, 
+              backrefEntry, 
+              renderMdToHtml (wikiWordToMdLink content), 
+              pageFooter]        
+```
 
 
 # All the rest is still Work in progress !
