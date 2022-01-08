@@ -338,24 +338,24 @@ getPageR pageName = do
 computeMaybeBackrefs :: FilePath -> PageName -> Maybe Text -> IO (Maybe [PageName])
 computeMaybeBackrefs path pageName maybeShowRefs =
   case maybeShowRefs of
-    Nothing -> return Nothing                            -- if maybeShowRefs == Nothing, return Nothing
-    Just _  -> do                                        -- else compute list of all references to page by
-      allPages <- computeIndex path                      -- computing list of all pages in wiki
+    Nothing -> return Nothing                      -- if maybeShowRefs == Nothing, return Nothing
+    Just _  -> do                                  -- else compute list of all references to page by
+      allPages <- computeIndex path                -- computing list of all pages in wiki
       backrefs <- computeBackRefs path pageName allPages -- compute all back references
-      return $ Just backrefs                             -- return this list wrapped as a Maybe
+      return $ Just backrefs                       -- return this list wrapped as a Maybe
 
 
 -- | compute a list of all pages that contain references to pageName
 computeBackRefs :: FilePath -> PageName -> [PageName] -> IO [PageName]
 computeBackRefs path pageName allPages = do
-  let filteredPages = delete pageName allPages   -- filter pagename from list of pages (avoid self refs)
-  markRefs <- mapM                               -- create a list of bools: True if a page contains a ref,
-    (fmap containsBackref . TIO.readFile . fileNameFor path)             -- else False
+  let filteredPages = delete pageName allPages   -- filter pagename from list of pages
+  markRefs <- mapM                               -- create a list of bools: True if a page contains
+    (fmap containsBackref . TIO.readFile . fileNameFor path)             -- a reference, else False
     filteredPages
   let pageBoolPairs = zip filteredPages markRefs -- create a zipped list of (pageName, Bool) pairs
   return $ map fst (filter snd pageBoolPairs)    -- return only pages marked True
   where
-    containsBackref content =                    -- returns True if content contains pageName, else False
+    containsBackref content =                    -- returns True if content contains pageName
       asText pageName `T.isInfixOf` content
 ```
 
