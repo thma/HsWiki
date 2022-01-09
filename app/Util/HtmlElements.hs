@@ -113,12 +113,13 @@ searchBox search =
     ++
     "<form action=\"/actions/find\""
       ++ " method=\"GET\">"
-      ++ "<input type=\"text\" id=\"search\" name=\"search\" size=\"50\" value=\"" ++ T.unpack search ++ "\" "
+      ++ "<input type=\"text\" id=\"search\" name=\"search\" value=\"" ++ T.unpack search ++ "\" "
       ++ "onfocus=\"this.setSelectionRange(9999, 9999)\" "
       ++ "onkeyup=\"this.form.submit()\" /> "
       ++ "<input type=\"submit\" value=\"find\" />"
       ++ "</form>"
 
+-- | build view for GraphViz representation of wiki page structure
 buildGraphView :: [([PageName], PageName)] -> Html
 buildGraphView graph =
   toHtml
@@ -126,23 +127,30 @@ buildGraphView graph =
       menuBar "",
       renderMdToHtml "# Site Map \n",
       renderMdToHtml "[View as List](/actions/toc) \n",
-      top,
-      preEscapedToHtml $ renderNodes $ allNodes graph,
-      preEscapedToHtml $ renderGraph graph,
-      bottom,
+      preGraph,                                         -- load wasm scripts, begin JS script
+      preEscapedToHtml $ renderNodes $ allNodes graph,  -- build list of all PageName nodes
+      preEscapedToHtml $ renderGraph graph,             -- build link structure as directed graph
+      postGraph,                                        -- render DOT digraph
       pageFooter
     ]
 
+-- | render graph in DOT syntax (from -> to;)
 renderGraph :: [([PageName], PageName)] -> String
 renderGraph graph =
   foldr
     (\str -> ((str ++ ",\n") ++))
     ""
-    (concatMap (\(sources, target) -> map (\s -> "'\"" ++ asString s ++ "\" -> \"" ++ asString target ++ "\";'") sources) graph)
+    (concatMap (\(sources, target) -> 
+      map 
+        (\s -> "'\"" ++ asString s ++ "\" -> \"" ++ asString target ++ "\";'") 
+        sources) 
+      graph)
 
+-- | extract list of unique PageNames from graph
 allNodes :: [([PageName], PageName)] -> [PageName]
 allNodes = nub . (uncurry (flip (:)) =<<)
 
+-- | render list of PageNames as DOT list of nodes with some nice formatting
 renderNodes :: [PageName ] -> String
 renderNodes =
   concatMap
@@ -153,8 +161,9 @@ renderNodes =
           ++ "\"];', \n"
     )
 
-top :: Html
-top =
+-- | Html with script code for loading d3-graphviz and opening the DOT digraph
+preGraph :: Html
+preGraph =
   preEscapedToHtml $
     "<script src=\"//d3js.org/d3.v5.min.js\"></script>"
       ++ "<script src=\"https://unpkg.com/@hpcc-js/wasm@0.3.11/dist/index.min.js\"></script>"
@@ -165,8 +174,9 @@ top =
       ++ "    [\n"
       ++ "        'digraph  {',\n"
 
-bottom :: Html
-bottom =
+-- | Html with script code for rendering the DOT digraph
+postGraph :: Html
+postGraph =
   preEscapedToHtml $
     "        '}'\n"
       ++ "     ];\n"

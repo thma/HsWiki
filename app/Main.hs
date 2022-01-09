@@ -64,12 +64,15 @@ getIndexR = do
   index <- liftIO $ computeIndex path
   return $ buildIndex index
 
+-- | handler for GET /actions/graph
 getGraphR :: Handler Html
-getGraphR = do
-  path     <- getDocumentRoot
-  allPages <- liftIO $ computeIndex path
-  allRefs  <- liftIO $ mapM (\p -> computeBackRefs path p allPages) allPages
-  return $ buildGraphView $ zip allRefs allPages
+getGraphR = do                                    
+  path     <- getDocumentRoot                     -- obtain document root folder
+  allPages <- liftIO $ computeIndex path          -- compute list of all wiki pages
+  allRefs  <- liftIO $ mapM                       -- compute list of all back references
+    (\p -> computeBackRefs path p allPages)       
+    allPages                                      -- for each file in allPages
+  return $ buildGraphView $ zip allRefs allPages  -- return Html view for [([PageName], PageName)] graph
 
 -- | Handler for GET /#PageName
 getPageR :: PageName -> Handler Html
@@ -114,20 +117,26 @@ postEditR pageName = do
     Nothing -> return ()                     -- no content: do nothing
   redirect $ PageR pageName                  -- redirect to GET Page route (display content)
 
+-- | handler for GET /actions/find
 getFindR :: Handler Html
 getFindR = do
-  path <- getDocumentRoot
-  allPages <- liftIO $ computeIndex path
-  maybeSearch <- lookupGetParam "search"
+  path <- getDocumentRoot                       -- obtain path to document root
+  allPages <- liftIO $ computeIndex path        -- compute a list of all page names in wiki
+  maybeSearch <- lookupGetParam "search"        -- check whether query param 'search' is set
   case maybeSearch of
-    Nothing     -> return $ buildFindPage "" []
-    Just ""     -> return $ buildFindPage "" []
-    Just search -> do
-      let containsSearchText content = T.toLower search `T.isInfixOf` T.toLower content
-      markMatches <- liftIO $ mapM (\p -> fmap containsSearchText $ return (asText p) <> TIO.readFile (fileNameFor path p)) allPages
-      let pageBoolPairs = zip allPages markMatches
-      let matchingPages = map fst (filter snd pageBoolPairs)
-      return $ buildFindPage search matchingPages
+    Nothing     -> return $ buildFindPage "" [] -- if maybeSearch == Nothing or Just ""
+    Just ""     -> return $ buildFindPage "" [] -- then return empty find page
+    Just search -> do                           
+      markMatches <- liftIO $                   -- else create a list of Bools by
+        mapM                                    -- returning True for each file that matches
+          (\p -> fmap containsSearchText $      -- search, else False
+            return (asText p) <> TIO.readFile (fileNameFor path p)) 
+          allPages
+      let pageBoolPairs = zip allPages markMatches  -- create a zipped list [(PageName, Bool)]
+      let matchingPages = map fst (filter snd pageBoolPairs) -- filter for all matching pages
+      return $ buildFindPage search matchingPages   -- build find page with search term and 
+        where                                       -- list of matching pages
+          containsSearchText content = T.toLower search `T.isInfixOf` T.toLower content
 
 -- | write a log entry to the RecentChanges page
 writeLogEntry :: FilePath -> PageName -> SockAddr -> IO ()

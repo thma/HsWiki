@@ -1,4 +1,4 @@
-# HsWiki
+# Writing a Wiki Server with Yesod
 
 <a href="https://github.com/thma/HsWiki/actions"><img src="https://github.com/thma/HsWiki/workflows/Haskell%20CI/badge.svg" alt="Actions Status" /></a> 
 <a href="https://github.com/thma/HsWiki"><img src="https://thma.github.io/img/forkme.png" height="20"></a></p>
@@ -68,7 +68,7 @@ renderMdToHtml = preEscapedToHtml . commonmarkToHtml [] []
 ### Type safe page names
 
 In order to work with the wiki page names in a type safe manner we first introduce a newtype `PageName`.
-In order to make sure that only proper [WikiWords](https://en.wikipedia.org/w/index.php?title=WikiWord) can be used as page names I'm using a smart constructor `pageName` which only constructs a `PageName`instance if the intented page name matches the `wikiWordMatch` regular expression:
+In order to make sure that only proper [WikiWords](https://en.wikipedia.org/w/index.php?title=WikiWord) can be used as page names I'm using a [smart constructor](https://wiki.haskell.org/Smart_constructors) `pageName` which only constructs a `PageName`instance if the intented page name matches the `wikiWordMatch` regular expression:
 
 ```haskell
 newtype PageName = Page Text deriving (Eq, Read, Show)
@@ -134,8 +134,9 @@ The definition (2) states that for any route /edit/`PageName` two functions must
 getEditR  :: PageName -> Handler Html
 postEditR :: PageName -> Handler Html
 ```
+If you want to know how exactly handler function are invoked from the Yesod framework and how the route dispatching works, please have a look at the excellent [Yesod documentation](https://www.yesodweb.com/book/) which features a complete walkthrough with a HelloWorld application.
 
-### serving an editor
+### Serving an editor
 
 Now let's study the implementation of these two function step by step, first the GET handler:
 
@@ -301,7 +302,7 @@ This feature can best be demonstrated with an example. First we lookup up page `
 
 ![CategoryMammal](img/CategoryMammal.png)
 
-The headline of this page is a hyperlink which references `http://localhost:3000/CategoryMammal?showBackrefs`. Following the the limk results in the following page:
+The headline of this page is a hyperlink which references `http://localhost:3000/CategoryMammal?showBackrefs`. Following the link results in the following page:
 
 
 ![CategoryMammal](img/CategoryMammalWithBackLinks.png)
@@ -424,22 +425,190 @@ And here comes a sample screen shot of the RecentChanges page:
 
 ![RecentChanges](img/RecentChanges.png)
 
+
 ## Have a full text search
+
+For the full text search Iǜe provided a specific route `/actions/find` to avoid overlap with ordinary content pages:
+
+```haskell
+mkYesod "HsWiki" [parseRoutes|
+/actions/find/  FindR     GET
+|]
+```
+
+The corresponding handler function `getFindR` is defined as follows:
+
+```haskell
+-- | handler for GET /actions/find
+getFindR :: Handler Html
+getFindR = do
+  path <- getDocumentRoot                       -- obtain path to document root
+  allPages <- liftIO $ computeIndex path        -- compute a list of all page names in wiki
+  maybeSearch <- lookupGetParam "search"        -- check whether query param 'search' is set
+  case maybeSearch of
+    Nothing     -> return $ buildFindPage "" [] -- if maybeSearch == Nothing or Just ""
+    Just ""     -> return $ buildFindPage "" [] -- then return empty find page
+    Just search -> do                           
+      markMatches <- liftIO $                   -- else create a list of Bools by
+        mapM                                    -- returning True for each file that matches
+          (\p -> fmap containsSearchText $      -- search, else False
+            return (asText p) <> TIO.readFile (fileNameFor path p)) 
+          allPages
+      let pageBoolPairs = zip allPages markMatches  -- create a zipped list [(PageName, Bool)]
+      let matchingPages = map fst (filter snd pageBoolPairs) -- filter for all matching pages
+      return $ buildFindPage search matchingPages   -- build find page with search term and 
+        where                                       -- list of matching pages
+          containsSearchText content = T.toLower search `T.isInfixOf` T.toLower content
+```
+
+The `buildFindPage` function is responsible for assembling the Html view of this page.
+
+
+```haskell
+buildFindPage :: Text -> [PageName] -> Html
+buildFindPage search pages = toHtml
+  [ pageHeader True,
+    menuBar "",
+    renderMdToHtml "# FindPage ",
+    searchBox search,
+    renderMdToHtml $ T.pack $ concatMap (\p -> "- [" ++ asString p ++ "](/" ++ asString p ++ ") \n") pages,
+    pageFooter
+  ]
+
+searchBox :: Text -> Html
+searchBox search =
+  preEscapedToHtml $
+    "<script type=\"text/javascript\">"
+    ++ "function init()"
+    ++ "{"
+    ++ "     document.getElementById(\"search\").focus();"
+    ++ "}"
+    ++ "</script>"
+    ++
+    "<form action=\"/actions/find\""
+      ++ " method=\"GET\">"
+      ++ "<input type=\"text\" id=\"search\" name=\"search\" value=\"" ++ T.unpack search ++ "\" "
+      ++ "onfocus=\"this.setSelectionRange(9999, 9999)\" "
+      ++ "onkeyup=\"this.form.submit()\" /> "
+      ++ "<input type=\"submit\" value=\"find\" />"
+      ++ "</form>"
+```
+
+The only interesting thing here is that I've include a bit of JavaScript to enable page updates while typing into the
+find box. See the FindPage in action below:
+
 
 ![FindPage](img/FindPage.png)
 
 ## Provide a graph view of pages and their links
 
+So far I've just reimplemented stuff that was already there in the original WikiWiki. While toying around with my HsWiki I thought it might be a nice addition to have a graph representation of the site content.
+
+As always I try to code as little as possible myself and get the hard work done by the experts. In this case I'm relying on my alltime favourite Graph rendering library [GraphViz](https://graphviz.org/). This time in it's web assembly incarnation [d3-graphviz](https://github.com/magjac/d3-graphviz).
+
+So again we'll have a specific route:
+
+```haskell
+mkYesod "HsWiki" [parseRoutes|
+/actions/graph  GraphR    GET
+|]
+```
+
+And a corresponding route handler function:
+
+```haskell
+-- | handler for GET /actions/graph
+getGraphR :: Handler Html
+getGraphR = do                                    
+  path     <- getDocumentRoot                     -- obtain document root folder
+  allPages <- liftIO $ computeIndex path          -- compute list of all wiki pages
+  allRefs  <- liftIO $ mapM                       -- compute list of all back references
+    (\p -> computeBackRefs path p allPages)       
+    allPages                                      -- for each file in allPages
+  return $ buildGraphView $ zip allRefs allPages  -- return Html view for [([PageName], PageName)] graph
+```
+
+Please note that this implementation has $O(n^2)$. This is caused by relying on `computeBackrefs` this function traverses all files and is called once for each file by `mapM`. 
+Improving this is left as an exercise for the intereseted reader (all pull requests are welcome!)
+
+The actual Html rendering is a bit more involved as I have to integrate the JS code for d3-graphviz and also to render the GraphViz DOT graph representation:
+
+```haskell
+-- | build view for GraphViz representation of wiki page structure
+buildGraphView :: [([PageName], PageName)] -> Html
+buildGraphView graph =
+  toHtml
+    [ pageHeader False,
+      menuBar "",
+      renderMdToHtml "# Site Map \n",
+      renderMdToHtml "[View as List](/actions/toc) \n",
+      preGraph,                                         -- load wasm scripts, begin JS script
+      preEscapedToHtml $ renderNodes $ allNodes graph,  -- build list of all PageName nodes
+      preEscapedToHtml $ renderGraph graph,             -- build link structure as directed graph
+      postGraph,                                        -- render DOT digraph
+      pageFooter
+    ]
+
+-- | render graph in DOT syntax (from -> to;)
+renderGraph :: [([PageName], PageName)] -> String
+renderGraph graph =
+  foldr
+    (\str -> ((str ++ ",\n") ++))
+    ""
+    (concatMap (\(sources, target) -> 
+      map 
+        (\s -> "'\"" ++ asString s ++ "\" -> \"" ++ asString target ++ "\";'") 
+        sources) 
+      graph)
+
+-- | extract list of unique PageNames from graph
+allNodes :: [([PageName], PageName)] -> [PageName]
+allNodes = nub . (uncurry (flip (:)) =<<)
+
+-- | render list of PageNames as DOT list of nodes with some nice formatting
+renderNodes :: [PageName ] -> String
+renderNodes =
+  concatMap
+    ( \n ->
+        "'\"" ++ asString n
+          ++ "\" [shape=\"rect\", style=\"rounded,filled\", fillcolor=\"#f4f5f6\", fontcolor=\"#9b4dca\", fontname=\"Roboto\",  URL=\"/"
+          ++ asString n
+          ++ "\"];', \n"
+    )
+
+-- | Html with script code for loading d3-graphviz and opening the DOT digraph
+preGraph :: Html
+preGraph =
+  preEscapedToHtml $
+    "<script src=\"//d3js.org/d3.v5.min.js\"></script>"
+      ++ "<script src=\"https://unpkg.com/@hpcc-js/wasm@0.3.11/dist/index.min.js\"></script>"
+      ++ "<script src=\"https://unpkg.com/d3-graphviz@3.0.5/build/d3-graphviz.js\"></script>"
+      ++ "<div id=\"graph\" ></div>"
+      ++ "<script>"
+      ++ "var dot =\n"
+      ++ "    [\n"
+      ++ "        'digraph  {',\n"
+
+-- | Html with script code for rendering the DOT digraph
+postGraph :: Html
+postGraph =
+  preEscapedToHtml $
+    "        '}'\n"
+      ++ "     ];\n"
+      ++ " \n"
+      ++ " d3.select(\"#graph\").graphviz()\n"
+      ++ "     .renderDot(dot.join(''));\n"
+      ++ " \n"
+      ++ " </script>\n"
+```
+
+You can see this in action in the following screen shot:
+
 ![SiteMap](img/SiteMap.png)
 
-# All the rest is still Work in progress !
+## Appendix
 
-
-
-
-
-
-## How to build
+### How to build
     stack init
     stack install
     HsWiki
@@ -451,71 +620,3 @@ Under Windows you will have to install the ICU library. I used the latest win64 
 - The actual lib files go to `C:\Users\<username>\AppData\Local\Programs\stack\x86_64-windows\msys2-<installdate>\mingw64\lib`
   Don't forget to strip version number from the .dll files (so icuuc70.dll becomes icuuc.dll)
 - The include files go to `C:\Users\<username>\AppData\Local\Programs\stack\x86_64-windows\msys2-<installdate>\mingw64\include\unicode`
-
-
-
-## How to deploy as docker container
-1. clone the [AlpineHaskell](https://github.com/thma/AlpineHaskell) project:
-```
-git clone https://github.com/thma/AlpineHaskell.git
-```
-2. change to the AlpineHaskell directory and build the alpine-haskell docker base-image by executing
-```
-$ ./build.sh 
-Sending build context to Docker daemon  4.808MB
-Step 1/2 : FROM alpine:3.7
- ---> 3fd9065eaf02
-Step 2/2 : ADD root /
- ---> Using cache
- ---> 20c57b0d04c7
-Successfully built 20c57b0d04c7
-Successfully tagged alpine-haskell:latest
-```
-3. verify that the image is visible in the local docker repository
-```
-$ sudo docker images
-REPOSITORY                    TAG                 IMAGE ID            CREATED             SIZE
-...
-alpine-haskell                latest              20c57b0d04c7        3 weeks ago         8.83MB
-...
-```
-4. Build the hswiki docker image by executing:
-```
-$ sudo docker build -t hswiki .
-Sending build context to Docker daemon  68.05MB
-Step 1/5 : FROM alpine-haskell
- ---> 20c57b0d04c7
-Step 2/5 : RUN mkdir content
- ---> Using cache
- ---> 052901d31ac2
-Step 3/5 : COPY ./.stack-work/install/x86_64-linux-nopie/lts-11.2/8.2.2/bin/HsWiki /hswiki
- ---> Using cache
- ---> 2c0e3e004953
-Step 4/5 : EXPOSE 3000
- ---> Using cache
- ---> 0d3309b73c48
-Step 5/5 : CMD ["/hswiki"]
- ---> Using cache
- ---> f8e433015d75
-Successfully built f8e433015d75
-Successfully tagged hswiki:latest
-```
-5. start up the docker container by
-```
-$ sudo docker run -it -p 3000:3000 hswiki 
-HsWiki starting on port 3000, document root: content
-22/Apr/2018:08:41:27 +0000 [Info#yesod-core] Application launched @(yesod-core-1.6.2-BbBvVW2wkIv5HBlOLVMZvZ:Yesod.Core.Dispatch ./Yesod/Core/Dispatch.hs:167:11)
-```
-
-With the above command the HsWiki application writes all documents into the /content folder within the
-docker container. After restarting the container all these documents will be gone as the
-container starts up the original image with an empty /content folder.
-
-In order to keep the generated documents persistent across container restarts you can use the docker --mount option as in the following example. The /tmp folder of the host system is mounted as /content in the docker container. Thus all created documents will be read from or written to the /tmp folder of the host system.
-
-```
-sudo docker run -it -p 3000:3000 --mount type=bind,source=/tmp,target=/content hswiki 
-HsWiki starting on port 3000, document root: content
-22/Apr/2018:08:47:30 +0000 [Info#yesod-core] Application launched @(yesod-core-1.6.2-BbBvVW2wkIv5HBlOLVMZvZ:Yesod.Core.Dispatch ./Yesod/Core/Dispatch.hs:167:11)
-
-```
