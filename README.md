@@ -3,10 +3,8 @@
 <a href="https://github.com/thma/HsWiki/actions"><img src="https://github.com/thma/HsWiki/workflows/Haskell%20CI/badge.svg" alt="Actions Status" /></a> 
 <a href="https://github.com/thma/HsWiki"><img src="https://thma.github.io/img/forkme.png" height="20"></a></p>
 
-<!-- MATH JAX-->
-<script type="text/javascript" src="https://thma.github.io/static/mathjax/tex-mml-chtml.js"></script>
+## Abstract
 
-## Abstract 
 In this blog post I'm presenting an implementation of a Wiki System 
 in the spirit of the legendary [C2-Wiki](http://wiki.c2.com/) - written in Haskell with the [Yesod](https://www.yesodweb.com/) framework.
 
